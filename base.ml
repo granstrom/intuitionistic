@@ -97,6 +97,10 @@ let enum_is_empty = Enum_set.is_empty
 
 let enum_of_enum_map mp = enum_make (List.map fst (Enum_map.bindings mp))
 
+(* Define the reverse application operator, in case we are using a
+   version of OCaml older than 4.01. *)
+let (|>) a b = b a
+
 (* Returns true if the two maps have the same sets of keys, and the *)
 (* respective mappings of the keys are equal in sense of the supplied *)
 (* function. *)
