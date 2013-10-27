@@ -209,9 +209,10 @@ and mono (ctx : Ctx.ctx) (m : Term.mono) : Value.set =
         end;
         let rho = Ctx.assign ctx in
         let __C = Eval.lift Eval.set rho (x, _C) in
-        cs |> List.iter
-            (fun (k, v) ->
-	      poly ctx (apv __C (Imm(Value.Enum_cst (c, k)))) v);
+        List.iter
+          (fun (k, v) ->
+	    poly ctx (apv __C (Imm(Value.Enum_cst (c, k)))) v)
+          cs;
         ap __C (lazy (Eval.mono rho n))
       | _ -> raise Error
     end
