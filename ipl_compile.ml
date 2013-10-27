@@ -66,8 +66,9 @@ and block = label option ref * block'
 (* Code to print values and blocks for debugging purposes. *)
 let format_map (vv:Format.formatter -> 'a -> unit)
     (fmt:Format.formatter) (a:'a Base.enum_map) =
-  a |> Base.Enum_map.iter (fun k v ->
+  Base.Enum_map.iter (fun k v ->
     Format.fprintf fmt "@ %a: %a" Base.format_enum_lit k vv v)
+    a
 let rec format_value (fmt:Format.formatter) :value -> unit =
   let open Format in
   function

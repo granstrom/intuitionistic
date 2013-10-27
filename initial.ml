@@ -14,6 +14,8 @@
 (* See the License for the specific language governing permissions and        *)
 (* limitations under the License.                                             *)
 
+open Base
+
 let verify_type ctx t = Check_term.set ctx (Reify.set t)
 
 let verify ctx a t = Check_term.poly ctx t (Reify.el a)
@@ -25,15 +27,15 @@ let rec mkctx =
     let ctx = mkctx cs in
     verify_type ctx _A;
     verify ctx a _A;
-    Ctx.extend_el_value ctx (Base.Variable x) a _A
+    Ctx.extend_el_value ctx (Variable x) a _A
 
 let mkstruct lst =
   let open Value in
-  let lit x = Base.Enum_lit x in
-  let types = lst |> List.map (fun (x, _, z) -> lit x, z) |> Base.enum_map_make in
-  let values = lst |> List.map (fun (x, y, _) -> lit x, y) |> Base.enum_map_make in
+  let lit x = Enum_lit x in
+  let types = lst |> List.map (fun (x, _, z) -> lit x, z) |> enum_map_make in
+  let values = lst |> List.map (fun (x, y, _) -> lit x, y) |> enum_map_make in
   let cod = Fn(fun x -> Eval.univ (Eval.mkEnum_d x (Cst Type) types)) in
-  let enum = Enum (Base.enum_of_enum_map values) in
+  let enum = Enum (enum_of_enum_map values) in
   lambda(fun x -> Eval.mkEnum_d x cod values), Pi(enum, cod)
 
 let builtin_struct lst =

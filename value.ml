@@ -287,7 +287,7 @@ and eq_neut (x : neut) (y : neut) : unit =
 	   keys in the destructor function. *)
 	| _ -> raise Not_equal
       in
-      Base.Enum_map.merge mergefn a aa |> ignore
+      ignore (Base.Enum_map.merge mergefn a aa)
     end
   | Subst(r, _C, d), Subst(rr, _CC, dd) ->
     eq_neut r rr; (Base.comp fork fork) eq_set _C _CC; eq_el d dd

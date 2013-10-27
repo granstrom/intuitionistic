@@ -35,7 +35,7 @@ let extend_el (ctx : ctx) (x : Base.var) (a : Value.el) (_A : Value.set Lazy.t) 
   match ctx with
   | Ctx(vs, es) ->
     begin
-      match vs |> Base.try_find (fun (y, _) -> x = y) with
+      match Base.try_find (fun (y, _) -> x = y) vs with
       | Some (_, _) -> raise (Rebound_error(ctx, x))
       | None -> ()
     end;
@@ -56,6 +56,6 @@ let extend_el_value (ctx : ctx) (x : Base.var) (a : Value.el) (_A : Value.set) :
 let lookup x =
   assert (x <> Base.Variable "");
   function Ctx(vs, _) ->
-    match vs |> Base.try_find (fun (y, _) -> x = y) with
+    match Base.try_find (fun (y, _) -> x = y) vs with
     | Some (_, _A) -> Lazy.force _A
     | None -> raise Not_found

@@ -97,6 +97,8 @@ let plus_u = Enum_u Base.plus_enum
 
 let term_lift f ids (p, a) (q, b) = f ((p, q) :: ids) a b
 
+let (|>) a b = b a
+
 let rec eq_set ids uu vv =
   match uu, vv with
   | Pi(a, b), Pi(aa, bb)

@@ -465,7 +465,7 @@ let empty_interface =
   Pair(Sigma_u(empty_u, Fn(abort Type)), lambda(fun x -> abort Type (mkFst x)))
 
 let methods is_list =
-  let is = is_list |> Base.enum_map_make in
+  let is = Base.enum_map_make is_list in
   let is_set = Base.enum_of_enum_map is in
   let i_fam x = mkEnum_d x (Value.Cst interface) is in
   mkApp (mkApp interface_sum (Value.Enum_u is_set)) (Value.lambda i_fam)

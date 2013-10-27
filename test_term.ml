@@ -258,6 +258,7 @@ let nok_pair (a, _A) =
   then failwith "Expected check to fail...";
   ()
 
+let (|>) a b = b a
 let main () =
   oks |> List.iter ok_pair;
   ok_eqs |> List.iter ok_eq_pair;
