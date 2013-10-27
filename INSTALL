@@ -1,6 +1,9 @@
 REQUIREMENTS:
 
 - Ocaml v4.01 or later.
+  Note that some package managers have slow to pick up this release.
+  It is available from http://caml.inria.fr/ocaml/release.en.html.
+  You can find the version of your release using 'ocamlc -v'.
 - LLVM 3.4 or later.
 - Ocaml-LLVM bindings.
 

@@ -139,22 +139,23 @@ let builtin op vals =
   | Value.Lsr a, [x; y] -> Llvm.build_lshr x (mk_shift a y) "" builder
   | Value.Asr a, [x; y] -> Llvm.build_ashr x (mk_shift a y) "" builder
   (* Sign extend y to b. *)
-  | Value.Sext(a, b), [y] when a < b -> Llvm.build_sext y (lltype_of_size b) "" builder
+  | Value.Sext(a, b), [y] when a < b ->
+    Llvm.build_sext y (lltype_of_size b) "" builder
   (* Truncate y to b. *)
-  | Value.Sext(a, b), [y] when a > b -> Llvm.build_trunc y (lltype_of_size b) "" builder
+  | Value.Sext(a, b), [y] when a > b ->
+    Llvm.build_trunc y (lltype_of_size b) "" builder
   | Value.Sext(a, b), [y] (* when a = b *) -> y
   | Value.Aeq(_), [x; y] ->
     to_bool (Llvm.build_icmp Llvm.Icmp.Eq  x y "" builder)
   | Value.Less(_), [x; y] ->
     to_bool (Llvm.build_icmp Llvm.Icmp.Slt x y "" builder)
+  (* TODO: can a proof object end up being compiled? If so, simply add
+     an undef instruction here instead of raising an exception. *)
   | _ -> raise Presupposition_error
-
-let assert_void (v:llvalue):unit = assert((Llvm.type_of v) == void)
-
 
 let emit_alloca name tt =
   let start_bb = insertion_block () in
-  let the_function, entry_bb = function_and_entry start_bb in
+  let _, entry_bb = function_and_entry start_bb in
   position_at_end entry_bb;
   let local_var = Llvm.build_alloca tt name builder in
   position_at_end start_bb;
@@ -271,7 +272,7 @@ let rec compile_block (block:block) :unit =
     let from'' = Llvm.build_phi [from', start_bb] "range" builder in
     let cond = Llvm.build_icmp Llvm.Icmp.Ult from'' t0' "" builder in
     Llvm.build_cond_br cond loop_bb end_bb builder |> ignore;
-      (* -------- *)
+    (* -------- *)
     position_at_end loop_bb;
     let old_var_map = !var_map in
     var_map := Base.Var_map.add x from'' old_var_map;
@@ -282,7 +283,7 @@ let rec compile_block (block:block) :unit =
     let from''' = Llvm.build_add from'' (Llvm.const_int i32 1) "" builder in
     Llvm.add_incoming (from''', loop_end_bb) from'';
     build_br begin_bb;
-      (* -------- *)
+    (* -------- *)
     position_at_end end_bb;
     var_map := old_var_map;
     lbl_map := old_lbl_map;
@@ -301,9 +302,9 @@ let rec compile_block (block:block) :unit =
     let old_var_map = !var_map in
     var_map := Base.Var_map.add x local_val old_var_map;
     let vv = compile_value v in
-      (* Store new value in cell. *)
+    (* Store new value in cell. *)
     Llvm.build_store vv local_var builder |> ignore;
-      (* Discard binding for x by using old_var_map. *)
+    (* Discard binding for x by using old_var_map. *)
     var_map := Base.Var_map.add y vv old_var_map;
     compile_block body;
     var_map := old_var_map
@@ -364,51 +365,47 @@ and compile_value :value->llvalue =
 
 
 
-
-
-
-(* Below is some ugly but necessary code for actually compiling Llvm
-   functions. *)
-
-open Llvm_executionengine
-open Llvm_target
-open Llvm_scalar_opts
-
-let mk_module name = Llvm.create_module global_context name
-let setup_module the_module =
+let setup_module name =
+  let the_module = Llvm.create_module global_context name in
+  let open Llvm_executionengine in
   ignore (initialize_native_target ());
   (* Create the JIT. *)
   let the_execution_engine = ExecutionEngine.create the_module in
   let the_fpm = Llvm.PassManager.create_function the_module in
   (* Set up the optimizer pipeline.  Start with registering info about how the
    * target lays out data structures. *)
-  DataLayout.add (ExecutionEngine.target_data the_execution_engine) the_fpm;
+  Llvm_target.DataLayout.add
+    (ExecutionEngine.target_data the_execution_engine) the_fpm;
   (* Promote alloca slots that have only loads and stores to registers. *)
-  add_memory_to_register_promotion the_fpm;
+  Llvm_scalar_opts.add_memory_to_register_promotion the_fpm;
   (* Simplify the control flow graph (deleting unreachable blocks, etc). *)
-  add_cfg_simplification the_fpm;
+  Llvm_scalar_opts.add_cfg_simplification the_fpm;
   (* Loop invariant code motion. *)
-  add_licm the_fpm;
+  Llvm_scalar_opts.add_licm the_fpm;
+  (* Induction variable simplification. *)
+  Llvm_scalar_opts.add_ind_var_simplification the_fpm;
   (* Loop deletion. *)
-  add_loop_deletion the_fpm;
+  Llvm_scalar_opts.add_loop_deletion the_fpm;
   (* Do simple "peephole" optimizations and bit-twiddling optzn. *)
-  add_instruction_combination the_fpm;
+  Llvm_scalar_opts.add_instruction_combination the_fpm;
   (* Reassociate expressions. *)
-  add_reassociation the_fpm;
+  Llvm_scalar_opts.add_reassociation the_fpm;
   (* Combine instructions. *)
-  add_instruction_combination the_fpm;
+  Llvm_scalar_opts.add_instruction_combination the_fpm;
   (* Propagate constants. *)
-  add_constant_propagation the_fpm;
+  Llvm_scalar_opts.add_constant_propagation the_fpm;
+  (* Sparse conditional constant propagation. *)
+  Llvm_scalar_opts.add_sccp the_fpm;
   (* Eliminate Common SubExpressions. *)
-  add_gvn the_fpm;
+  Llvm_scalar_opts.add_gvn the_fpm;
   (* Simplify the control flow graph (deleting unreachable blocks, etc). *)
-  add_cfg_simplification the_fpm;
+  Llvm_scalar_opts.add_cfg_simplification the_fpm;
   (* Eliminate Common SubExpressions. *)
-  add_gvn the_fpm;
+  Llvm_scalar_opts.add_gvn the_fpm;
   (* Simplify the control flow graph (deleting unreachable blocks, etc). *)
-  add_cfg_simplification the_fpm;
+  Llvm_scalar_opts.add_cfg_simplification the_fpm;
   (* Aggressive dead code elimination. *)
-  add_aggressive_dce the_fpm;
+  Llvm_scalar_opts.add_aggressive_dce the_fpm;
   Llvm.PassManager.initialize the_fpm |> ignore;
   the_execution_engine, the_module, the_fpm
 
@@ -436,7 +433,7 @@ let setup_fn the_module name (proto:llproto):Llvm.llvalue * llvalue Var_map.t =
   in
   f, m
 
-let main_engine, main_module, main_fpm = setup_module (mk_module "IPL")
+let main_engine, main_module, main_fpm = setup_module "IPL"
 
 let compile_function_ name (proto:llproto) (body:Value.el) invoke =
   (* Format.printf "Body:%a\n@?" Printing.el body; *)
@@ -446,7 +443,6 @@ let compile_function_ name (proto:llproto) (body:Value.el) invoke =
   (* Create a new basic block to start insertion into. *)
   let start_bb = append_block "start" the_function in
   Llvm.position_at_end start_bb builder;
-  Ipl_compile.reset_counters ();
   try
     let block = Ipl_compile.el_iy_block
       invoke
@@ -458,8 +454,10 @@ let compile_function_ name (proto:llproto) (body:Value.el) invoke =
     target_map := Target_map.empty;
     alloca_map := Alloca_map.empty;
     compile_block block;
+    Ipl_compile.reset_counters ();
     (* Now that all alloca instructions have been inserted to the
-       entry block, have it jump to the start block at the end. *)
+       entry block, have it jump to the start block at the end of the
+       entry block. *)
     Llvm.position_at_end entry_bb builder;
     build_br start_bb;
     (* Llvm.dump_module main_module; *)
@@ -483,7 +481,9 @@ let compile_function name (proto:proto) (body:Value.el) invoke =
   in
   compile_function_ name (cod, dom) body invoke
 
-let generic_of_imm:imm -> GenericValue.t = function
+let generic_of_imm:imm -> Llvm_executionengine.GenericValue.t =
+  let open Llvm_executionengine in
+  function
   | Value.Imm8 x -> GenericValue.of_int i8 (Char.code x)
   | Value.Imm16 x -> GenericValue.of_int i16 x
   | Value.Imm32 x -> GenericValue.of_int32 i32 x
@@ -491,7 +491,9 @@ let generic_of_imm:imm -> GenericValue.t = function
   | Value.Enum_cst(cs, c) -> GenericValue.of_int i32 (enum_ordinal cs c)
   | Value.Refl -> raise Presupposition_error
 
-let generic_eq_imm (y:GenericValue.t) = function
+let generic_eq_imm (y:Llvm_executionengine.GenericValue.t) =
+  let open Llvm_executionengine in
+  function
   | Value.Imm8 x -> GenericValue.as_int y = Char.code x
   | Value.Imm16 x -> GenericValue.as_int y = x
   | Value.Imm32 x -> GenericValue.as_int32 y = x
