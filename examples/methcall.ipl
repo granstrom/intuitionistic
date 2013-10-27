@@ -1,0 +1,102 @@
+// This file implements the first part of the methcall benchmark from
+// the language shootout.
+//
+// For background on how interfaces and procedures are implemented in
+// IPL, please refer to the paper.
+//
+// Johan Georg Granström. "A new paradigm for component-based
+// development". In: J. Software 7 (2012), pp. 1136-1148.
+
+// First, this is the interface that we must implement.
+val I_toggle = meth {
+  value: meth(_ void) bool,
+  activate: meth(_ void) void
+};
+
+// This interface is used internally in IPL to implement the 'new' construct.
+val fun (I interface) ++ (J interface) interface = meth {
+  left: I,
+  right: J
+};
+
+// This is the interface introduced by new_i32.
+val prop32 = meth(_ i32 -> i32) i32;
+
+// In fact, new_i32 has the following type:
+assert new_i32 is
+  i32 ->
+  dep(I interface) ->
+  dep(A type) ->
+  tuple(J interface, _ (I ++ J => A) -> I => A);
+
+// Moreover, the interface J is prop32.
+assert fst(new_i32(0)(meth {})(enum {})) = prop32 is interface;
+
+
+// Abbreviations for the implementation of the toggle.
+val (==) = mod32::==;
+val (-) = mod32::-;
+
+// Here is an implementation of a simple toggler. This constructions
+// corresponds to implementing a class with state of type i32 and the
+// methods of I_toggle.
+//
+// A more readable syntax for the same construct would be something
+// like this:
+//
+// class toggle(start_state bool) {
+//   new state = new_i32(start_state ? 1 : 0);
+//   meth value(_ void) bool = block {
+//     val x = get state;
+//     yield(x == 1);
+//   };
+//   meth activate(_ void) void = block {
+//     state := 1 - state;
+//   };
+// };
+//
+// Of course, future versions of IPL should support mutable enum
+// variables (e.g. bool): in the current version, variables have to
+// have type iN for some N in {8, 16, 32, 64}.
+//
+// The definitions below shows how this class has to be written in the
+// current implementation of IPL, and has the virtue of revealing how
+// classes are implemented "under the hood".
+
+val fun toggle_helper(
+  I interface, A type, prog I ++ I_toggle => A) I ++ prop32 => A =
+interpret prog {
+  fun {
+    left@x: call(left@x),
+    right@: fun {
+      value@_: block { val x = get right; yield(x == 1); },
+      activate@_: block { right := 1 - right; }
+    }
+  }
+};
+
+val fun toggle(start_state bool)
+  dep(I interface) ->
+  dep(A type) ->
+  tuple(J interface, _ (I ++ J => A) -> I => A) =
+  fun(I) fun(A)
+  (I_toggle, fun(prog)
+    snd(new_i32(start_state ? 1 : 0)(I)(A))(toggle_helper(I, A, prog)));
+
+// This is the way the language shootout problem is implemented i
+// C/C++, using a counter val (here bval). Of course, this counter
+// could be removed and the final line replaced with
+// val x = b.call(value@());
+// yield(x ? 1 : 0);
+compile main(n i32) i32 = block {
+  new bval = new_i32(1);
+  new b = toggle(true);
+  for _ in 0 .. n {
+    do b.call(activate@());
+    val x bool = do b.call(value@());
+    bval := x ? 1 : 0;
+  }
+  yield(get bval);
+};
+
+test main(1000000) = 1;

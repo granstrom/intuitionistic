@@ -1,0 +1,98 @@
+// This file demonstrates how IPL eliminates closures and pairs during
+// compilation.
+
+val fun seq(A type) = (meth(_ A) void) => void;
+
+val (-.) = mod32::(-.);
+val (-) = mod32::-;
+val (+) = mod32::+;
+val (*) = mod32::*;
+val (<) = mod32::<;
+val sdiv = mod32::sdiv;
+val fun is_true(x bool) type = x eq(bool) true;
+val fun is_false(x bool) type = x eq(bool) false;
+
+val mean_variance = struct { mean: i32, variance: i32 };
+
+// This is a function that performs a computation and returns a
+// "closure".
+val fun compute_mean_and_variance(s seq(i32)) =
+purify tuple(x i32, _ is_true(0 < x)) -> mean_variance {
+  new sum = new_i32(0);
+  new squares = new_i32(0);
+  for c in s {
+    sum := sum + c;
+    squares := squares + c * c;
+  }
+  val sum = get sum;
+  val squares = get squares;
+  yield(fun(x, y) (
+    val mean = sdiv(sum, x, y);
+    val variance = sdiv(squares, x, y) - mean * mean;
+    fun {
+      mean: mean,
+      variance: variance
+  }));
+};
+
+val is_true_or_false dep(x bool) ->
+    union { true: is_true(x), false: is_false(x) } =
+fun {
+  true: true@refl,
+  false: false@refl
+};
+
+compile compute_variance(from i32, to i32) i32 = block {
+  val s seq(i32) = block {
+    for x in from .. to {
+      do call(x);
+    }
+  };
+  val n = to - from;
+  val v i32 = switch is_true_or_false(0 < n) {
+    case true@x:
+      val mv = compute_mean_and_variance(s)(n, x);
+      yield(mv::variance);
+    case false@_:
+      yield(-1);
+  }
+  yield(v);
+};
+
+// The variance of 2 3 4 5 6 7 8 9 10 11 12 13 14 is equal to 14.
+test compute_variance(2, 15) = 14;
+test compute_variance(10, 10) = -1;
+
+// Here is the resulting bytecode (with variables names improved).
+//
+// define i32 @compute_variance(i32 %from, i32 %to) {
+// entry:
+//   %0 = sub i32 %to, %from
+//   %1 = icmp sgt i32 %0, 0
+//   br i1 %1, label %begin, label %exit
+//
+// exit:                                           ; preds = %end, %entry
+//   %result = phi i32 [ -1, %entry ], [ %10, %end ]
+//   ret i32 %result
+//
+// begin:                                            ; preds = %loop, %entry
+//   %squares = phi i32 [ %5, %loop ], [ 0, %entry ]
+//   %sum = phi i32 [ %3, %loop ], [ 0, %entry ]
+//   %range = phi i32 [ %6, %loop ], [ %from, %entry ]
+//   %2 = icmp ult i32 %range, %to
+//   br i1 %2, label %loop, label %end
+//
+// loop:                                             ; preds = %begin
+//   %3 = add i32 %range, %sum
+//   %4 = mul i32 %range, %range
+//   %5 = add i32 %4, %squares
+//   %6 = add i32 %range, 1
+//   br label %begin
+//
+// end:                                              ; preds = %begin
+//   %7 = sdiv i32 %squares, %0
+//   %8 = sdiv i32 %sum, %0
+//   %9 = mul i32 %8, %8
+//   %10 = sub i32 %7, %9
+//   br label %exit
+// }

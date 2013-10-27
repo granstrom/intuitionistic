@@ -1,0 +1,24 @@
+SUMMARY.
+
+The intuitionistic programming language has a semantics based on
+intuitionistic type theory and compiles to LLVM bytecode without
+runtime garbage collection.
+
+
+DESCRIPTION.
+
+The intuitionistic programming language (IPL) combines a very high
+level of abstraction with compilation to efficient LLVM bytecode.
+
+The following language level features are supported:
+- first class pure functions,
+- first class dependent types,
+- generic programming,
+- first class interfaces,
+- first class procedures,
+- fully automatic memory management,
+- no runtime requirements,
+- no runtime garbage collection,
+- logical consistency,
+- precise type-theoretic semantics,
+- theorem proving capabilities.

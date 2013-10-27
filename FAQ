@@ -1,0 +1,13 @@
+* On which platforms does IPL run?
+
+The IPL compiler runs on any platform which has support for Ocaml and
+LLVM with the Ocaml bindings.
+
+The resulting programs are just LLVM assembly files and run on any
+platform which is supported by LLVM.
+
+* What license is IPL distributed under?
+
+IPL is distributed under the Apache License version 2.0.
+
+* What are the future plans for IPL?

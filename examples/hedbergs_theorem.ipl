@@ -1,0 +1,111 @@
+// This is an implementation of Hedberg's theorem in the
+// intuitionistic programming language.
+//
+// Michael Hedberg. "A coherence theorem for Martin-Löf’s type
+// theory". In: J. Funct. Programming 8 (1998), pp. 413-436.
+//
+// The main difference is that we prove the theorem only for small
+// types (IPL's 'type' corresponds to the first universe U in ITT).
+
+// First, propositional equality is symmetric.
+val fun sym(A type, x A, y A, z x eq(A) y) y eq(A) x =
+  subst(z, refl)(u, _) u eq(A) x;
+
+// Propositional equality is transitive.
+val fun trans(A type, x A, y A, z A, u x eq(A) y, v y eq(A) z) x eq(A) z =
+  subst(v, u)(i, _) x eq(A) i;
+
+// If z is a proof that x is equal to y, then sym(z) can be viewed as
+// a kind of inverse of z. Similarly, trans(z, w) can be viewed as a
+// kind of multiplication of identity proofs. The resulting formal
+// structure is called a groupoid. The following groupoid law states,
+// informally, that trans(z, sym(z)) is equal to the reflexivity
+// proof, which serves as the unit element of the groupoid.
+val fun groupoid(A type, x A, y A, z x eq(A) y)
+     trans(A, x, y, x, z, sym(A, x, y, z)) eq(x eq(A) x) refl = (
+  val fun C(i A, j x eq(A) i) type =
+    trans(A, x, i, x, j, sym(A, x, i, j)) eq(x eq(A) x) refl;
+  subst(z, refl)(i, j)C(i, j)
+);
+
+// This lemma states, informally, that if x is equal to y, then f(x)
+// is equal to f(y).
+val fun lift(A type, f A -> A, x A, y A, p x eq(A) y) f(x) eq(A) f(y) =
+  subst(p, refl)(i, _) f(x) eq(A) f(i)
+;
+
+// dec(A) represents the proposition that A is inhabited or empty,
+// i.e., that the inhabitation problem for A is decidable.
+val fun dec(A type) type = union {
+  inhabited: A,
+  empty: A -> enum {}
+};
+
+// A function is constant if, for all x and y, f(x) is equal to f(y).
+val fun is_c(A type, f A -> A) type = dep(x A, y A) -> f(x) eq(A) f(y);
+
+// On any decidable set, a constant function can be defined.
+val fun con(A type) dec(A) -> A -> A = fun {
+  inhabited@w:       fun(_) w,
+  empty@f:           fun(x) fun{}(f(x))
+};
+
+// Hedberg's constancy lemma states that the function defined above is
+// indeed constant.
+val fun con_lemma(A type) dep(z dec(A)) -> is_c(A, con(A)(z)) =
+  fun {
+    inhabited@_:      fun(_, _) refl,
+    empty@f:          fun(x, _) fun{}(f(x))
+};
+
+// We say that a set is collapsed, if, for all x and y, x is equal to y.
+val fun collapsed(A type) type = dep(x A, y A) -> x eq(A) y;
+
+// A function g is a left inverse to a function g if g(f(x)) is equal
+// to x, for all x.
+val fun is_li(A type, f A -> A, g A -> A) = dep(x A) -> g(f(x)) eq(A) x;
+
+// Hedberg's collapse lemma states that, if a set admits a constant
+// function with a left inverse, then the set is collapsed.
+val fun collapse_lemma(A type, f A -> A, g A -> A, c is_c(A, f), li is_li(A, f, g))
+        collapsed(A) = fun (a, b) (
+  val p a eq(A) g(f(a)) = sym(A, g(f(a)), a, li(a));
+  val q g(f(a)) eq(A) g(f(b)) = lift(A, g, f(a), f(b), c(a, b));
+  val r g(f(b)) eq(A) b = li(b);
+  val s a eq(A) g(f(b)) = trans(A, a, g(f(a)), g(f(b)), p, q);
+  trans(A, a, g(f(b)), b, s, r)
+);
+
+// eq_fam(A) denotes the family of functions on equality proofs on A.
+val fun eq_fam(A type) type = dep(x A, y A) -> x eq(A) y -> x eq(A) y;
+
+ // Each eq_fam(A) has a family of left inverses.
+val fun li(A type, v eq_fam(A)) eq_fam(A) =
+  fun(x, y) fun(w)
+  trans(A, x, y, y, w, sym(A, y, y, v(y, y)(refl)));
+
+// Hedberg's left inverse lemma states that the family of defined
+// above is a family of left inverses.
+val fun li_lemma(A type, v eq_fam(A))
+        dep(x A, y A) ->
+        is_li(x eq(A) y, v(x, y), li(A, v)(x, y)) = fun(x, y) fun(z) (
+  // Proof obligation is li(A, v)(x, y)(v(x, y)(z)) eq(x eq(A) y) z. But the
+  // left hand side is definitionally equal to
+  // trans(A, x, y, y, v(x, y)(z), sym(A, y, y, v(y, y)(refl))).
+  val p = groupoid(A, x, x, v(x, x)(refl));
+  subst(z, p)(i, j)
+  trans(A, x, i, i, v(x, i)(j), sym(A, i, i, v(i, i)(refl))) eq(x eq(A) i) j
+);
+
+// dec_eq(A) represents the proposition that A has decidable equality.
+val fun dec_eq(A type) type = dep(x A, y A) -> dec(x eq(A) y);
+
+// This is Hedberg's theorem, viz., that a set with decidable equality
+// has collapsed equality proofs.
+val fun hedberg(A type, d dec_eq(A)) dep(x A, y A) -> collapsed(x eq(A) y) = (
+  val fun v(x A, y A) = con(x eq(A) y)(d(x, y));
+  val fun vc(x A, y A) is_c(x eq(A) y, v(x, y)) = con_lemma(x eq(A) y)(d(x, y));
+  val w eq_fam(A) = li(A, v);
+  val fun wv(x A, y A) is_li(x eq(A) y, v(x, y), w(x, y)) = li_lemma(A, v)(x, y);
+  fun(x, y) collapse_lemma(x eq(A) y, v(x, y), w(x, y), vc(x, y), wv(x, y))
+);

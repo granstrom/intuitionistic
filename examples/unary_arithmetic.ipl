@@ -1,0 +1,58 @@
+// In proof assistants like Coq, Agda, and Epigram, it is popular to
+// do mathematics with unary numbers. This doesn't work so well in
+// IPL, as there are no recursive datatypes. However, we can do some
+// interesting things with interfaces and procedures.
+
+// A unary number is represented by a sequence of calls on an
+// interface.
+val unary = (meth(_ void)void) => void;
+
+// An integer can be converted to a unary integer.
+val fun i2u(x i32) unary = block {
+  for _ in 0..x {
+    do call();
+  }
+};
+
+// For example:
+assert i2u(3) = block {
+  do call();
+  do call();
+  do call();
+} is unary;
+
+
+// A unary integer can be converted to an integer.
+val fun u2i(x unary) = purify i32 {
+  new c = new_i32(0);
+  val (+) = mod32::+;
+  for _ in x {
+    c := c + 1;
+  }
+  yield(get c);
+};
+
+assert u2i(i2u(1000)) = 1000 is i32;
+
+// Unary integers can be added.
+val fun (x unary) + (y unary) unary = block {
+  do x;
+  do y;
+};
+
+// Unary integers can be multiplied.
+val fun (x unary) * (y unary) unary = block {
+  for _ in x {
+    do y;
+  }
+};
+
+// Try it all out.
+assert i2u(42) * i2u(10) + i2u(33) =
+       i2u(mod32::+(mod32::*(42, 10), 33)) is unary;
+
+// Compile unary integer multiplication to LLVM.
+compile mult(x i32, y i32) i32 = block { yield(u2i(i2u(x) * i2u(y))); };
+
+// Check that the compiled version works.
+test mult(1000, 1000) = 1000000;

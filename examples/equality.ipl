@@ -1,0 +1,50 @@
+// This module demonstrates the difference between definitional and
+// propositional equality.
+//
+// Johan Georg Granström. Treatise on Intuitionistic Type Theory.
+// Springer, 2011.
+
+// First, let's define an enumerated set with one element, similar to
+// 'void', but with the element 'nil instead of ().
+val unit = enum { nil };
+
+// A convenient abbreviation.
+val unitfn = unit -> unit;
+
+// Three functions unit -> unit.
+val fun constant(x unit) unit = 'nil;
+val fun identity(x unit) = x;
+val cases unitfn = fun { nil: 'nil};
+
+// Let's check that they indeed have the same type.
+assert constant is unitfn;
+assert identity is unitfn;
+assert cases is unitfn;
+
+// These three assertions are all invalid. That is, no pair of
+// functions are definitionally equal.
+//
+// assert constant = identity is unitfn;
+// assert constant = cases is unitfn;
+// assert identity = cases is unitfn;
+
+// Let's use infix equality (==) for equality between elements of the
+// set unit.
+val fun (x unit) == (y unit) = x eq(unit) y;
+
+// In fact, despite being definitionally distinct, the three functions
+// are in fact extensionally equal, as demonstrated by.
+val constant_eq_identity dep(x unit) -> constant(x) == identity(x) =
+  fun { nil: refl };
+val constant_eq_cases dep(x unit) -> constant(x) == cases(x) =
+  fun { nil: refl };
+val identity_eq_cases dep(x unit) -> identity(x) == cases(x) =
+  fun { nil: refl };
+
+// This is not surprising in view of the fact that the unit set is
+// collapsed in the following sense.
+val fun collapsed(x unit, y unit) x == y = (
+  val tmp dep(xx unit) -> dep(yy unit) -> xx == yy =
+    fun { nil: fun { nil: refl }};
+  tmp(x)(y)
+);

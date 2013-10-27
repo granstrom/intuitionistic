@@ -1,0 +1,14 @@
+REQUIREMENTS.
+
+- Ocaml v4.01 or later.
+- LLVM 3.4 or later.
+- Ocaml-LLVM bindings.
+
+INSTALLATION:
+
+Unpack the ZIP file and type make in the unpacked folder.
+This produces several binaries:
+
+./iplc      The iplc compiler.
+./iplc.opt  An optimized version of the iplc compiler.
+./iplctop   An Ocaml toplevel with iplc preloaded.
