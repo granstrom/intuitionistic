@@ -32,16 +32,15 @@ let rec mkctx =
 let mkstruct lst =
   let open Value in
   let lit x = Enum_lit x in
-  let types = lst |> List.map (fun (x, _, z) -> lit x, z) |> enum_map_make in
-  let values = lst |> List.map (fun (x, y, _) -> lit x, y) |> enum_map_make in
+  let types = enum_map_make (List.map (fun (x, _, z) -> lit x, z) lst) in
+  let values = enum_map_make (List.map (fun (x, y, _) -> lit x, y) lst) in
   let cod = Fn(fun x -> Eval.univ (Eval.mkEnum_d x (Cst Type) types)) in
   let enum = Enum (enum_of_enum_map values) in
   lambda(fun x -> Eval.mkEnum_d x cod values), Pi(enum, cod)
 
 let builtin_struct lst =
-  lst
-  |> List.map (fun (x, y) -> let v, t = Eval.builtin_val_type y in x, v, t)
-  |> mkstruct
+  mkstruct (
+    List.map (fun (x, y) -> let v, t = Eval.builtin_val_type y in x, v, t) lst)
 
 let mod_i name x =
   let open Value in

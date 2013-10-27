@@ -58,7 +58,7 @@ let insertion_block_terminator () =
 let position_at_end bb =
   Llvm.position_at_end bb builder
 let build_br bb =
-  Llvm.build_br bb builder |> ignore
+  ignore (Llvm.build_br bb builder)
 let function_and_entry bb =
   let the_function = Llvm.block_parent bb in
   let entry_bb = Llvm.entry_block the_function in
@@ -206,7 +206,7 @@ let rec compile_block (block:block) :unit =
         let start_bb = insertion_block () in
         let unreachable_bb = new_block "unreachable" in
         position_at_end unreachable_bb;
-        Llvm.build_unreachable builder |> ignore;
+        ignore (Llvm.build_unreachable builder);
         position_at_end start_bb;
         let vv = compile_value v in
         let switch =
@@ -223,7 +223,7 @@ let rec compile_block (block:block) :unit =
         Enum_map.iter compile_case bs;
     end
   | Ret(v) ->
-    Llvm.build_ret (compile_value v) builder |> ignore
+    ignore (Llvm.build_ret (compile_value v) builder)
   | End_purify(v, lbl) ->
     let vv = compile_value v in
     let vbb = insertion_block () in
@@ -271,7 +271,7 @@ let rec compile_block (block:block) :unit =
     position_at_end begin_bb;
     let from'' = Llvm.build_phi [from', start_bb] "range" builder in
     let cond = Llvm.build_icmp Llvm.Icmp.Ult from'' t0' "" builder in
-    Llvm.build_cond_br cond loop_bb end_bb builder |> ignore;
+    ignore (Llvm.build_cond_br cond loop_bb end_bb builder);
     (* -------- *)
     position_at_end loop_bb;
     let old_var_map = !var_map in
@@ -293,7 +293,7 @@ let rec compile_block (block:block) :unit =
     let old_alloca_map = !alloca_map in
     alloca_map := Alloca_map.add alloca local_var old_alloca_map;
     let init_n = compile_value init in
-    Llvm.build_store init_n local_var builder |> ignore;
+    ignore (Llvm.build_store init_n local_var builder);
     compile_block body;
     alloca_map := old_alloca_map
   | Load_and_store(alloca, x, v, y, body) ->
@@ -303,7 +303,7 @@ let rec compile_block (block:block) :unit =
     var_map := Base.Var_map.add x local_val old_var_map;
     let vv = compile_value v in
     (* Store new value in cell. *)
-    Llvm.build_store vv local_var builder |> ignore;
+    ignore (Llvm.build_store vv local_var builder);
     (* Discard binding for x by using old_var_map. *)
     var_map := Base.Var_map.add y vv old_var_map;
     compile_block body;
@@ -322,7 +322,7 @@ and compile_value :value->llvalue =
         let unreachable_bb = new_block "unreachable" in
         let merge_bb = new_block "merge" in
         position_at_end unreachable_bb;
-        Llvm.build_unreachable builder |> ignore;
+        ignore (Llvm.build_unreachable builder);
         position_at_end start_bb;
         let vv = compile_value v in
         let switch =
@@ -341,7 +341,7 @@ and compile_value :value->llvalue =
         in
         (* The return values of compile_case are modelled to be input to
            'build_phi'. *)
-        let incoming = Enum_map.bindings vs |> List.map compile_case in
+        let incoming = List.map compile_case (Enum_map.bindings vs) in
         position_at_end merge_bb;
         let phi = Llvm.build_phi incoming "merge" builder in
         phi
@@ -406,14 +406,14 @@ let setup_module name =
   Llvm_scalar_opts.add_cfg_simplification the_fpm;
   (* Aggressive dead code elimination. *)
   Llvm_scalar_opts.add_aggressive_dce the_fpm;
-  Llvm.PassManager.initialize the_fpm |> ignore;
+  ignore (Llvm.PassManager.initialize the_fpm);
   the_execution_engine, the_module, the_fpm
 
 type llproto = lltype * (var * lltype) list
 
 let setup_fn the_module name (proto:llproto):Llvm.llvalue * llvalue Var_map.t =
-  let names = snd proto |> List.map fst |> Array.of_list in
-  let args = snd proto |> List.map snd |> Array.of_list in
+  let names = Array.of_list (List.map fst (snd proto)) in
+  let args =  Array.of_list (List.map snd (snd proto))  in
   let cod = fst proto in
   let ft = Llvm.function_type cod args in
   let f =
@@ -476,9 +476,7 @@ let compile_function_ name (proto:llproto) (body:Value.el) invoke =
 type proto = Value.size * (var * Value.size) list
 let compile_function name (proto:proto) (body:Value.el) invoke =
   let cod = lltype_of_size (fst proto) in
-  let dom = snd proto |> List.map (fun (x, y) ->
-    x, lltype_of_size y)
-  in
+  let dom = List.map (fun (x, y) -> x, lltype_of_size y) (snd proto) in
   compile_function_ name (cod, dom) body invoke
 
 let generic_of_imm:imm -> Llvm_executionengine.GenericValue.t =

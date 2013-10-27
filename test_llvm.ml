@@ -47,7 +47,7 @@ open Llvm_executionengine
 
 let test name (result:Value.imm) (args:(var * Value.imm) list) str =
   let cod = Ipl_llvm.size_of_imm result in
-  let dom = args |> List.map (fun (x, y) -> x, Ipl_llvm.size_of_imm y) in
+  let dom = List.map (fun (x, y) -> x, Ipl_llvm.size_of_imm y) args in
   let ct, fn = compile name (cod, dom) str in
   (* Llvm.dump_value fn; *)
   (* Interpret function. *)
@@ -72,7 +72,7 @@ let test name (result:Value.imm) (args:(var * Value.imm) list) str =
   end;
   (* Execute compiled function. *)
   let cargs =
-    args |> List.map (fun (_, x) -> Ipl_llvm.generic_of_imm x) |> Array.of_list
+    Array.of_list (List.map (fun (_, x) -> Ipl_llvm.generic_of_imm x) args)
   in
   let r = ExecutionEngine.run_function fn cargs Ipl_llvm.main_engine in
   if not (Ipl_llvm.generic_eq_imm r result) then

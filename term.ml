@@ -97,8 +97,6 @@ let plus_u = Enum_u Base.plus_enum
 
 let term_lift f ids (p, a) (q, b) = f ((p, q) :: ids) a b
 
-let (|>) a b = b a
-
 let rec eq_set ids uu vv =
   match uu, vv with
   | Pi(a, b), Pi(aa, bb)
@@ -146,12 +144,10 @@ and eq_mono ids uu vv =
   | Poly(e, _A), Poly(ee, _AA) -> eq_poly ids e ee; eq_set ids _A _AA
   | Var x, Var xx ->
     begin
-      ids
-      |> Base.try_find (fun (y, yy) -> x = y || xx = yy)
-      |> function
-        | Some (y, yy) when x = y && xx = yy -> ()
-        | None when x = xx -> ()
-        | _ -> raise Value.Not_equal
+      match Base.try_find (fun (y, yy) -> x = y || xx = yy) ids with
+      | Some (y, yy) when x = y && xx = yy -> ()
+      | None when x = xx -> ()
+      | _ -> raise Value.Not_equal
     end
   | App(f, a), App(ff, aa) -> eq_mono ids f ff; eq_poly ids a aa
   | Fst(n), Fst(nn)
@@ -164,12 +160,15 @@ and eq_mono ids uu vv =
 	| Some xx, Some yy -> eq_poly ids xx yy; None
 	| _ -> raise Value.Not_equal
       in
-      Base.Enum_map.merge mergefn (Base.enum_map_make a) (Base.enum_map_make aa) |> ignore
+      let open Base in
+      ignore (Enum_map.merge mergefn (enum_map_make a) (enum_map_make aa))
     end
   | Range(n, m), Range(nn, mm) ->
     eq_poly ids n nn; eq_poly ids m mm
   | Subst(r, _C, d), Subst(rr, _CC, dd) ->
-    eq_mono ids r rr; (Base.comp term_lift term_lift) eq_set ids _C _CC; eq_poly ids d dd
+    eq_mono ids r rr;
+    (Base.comp term_lift term_lift) eq_set ids _C _CC;
+    eq_poly ids d dd
   | Builtin (p, r), Builtin (p', r')
     when p = p' && List.length r = List.length r' ->
     List.iter2 (eq_poly ids) r r'
@@ -185,7 +184,8 @@ and eq_mono ids uu vv =
   | Local2(b, i, a, n, c, t),  Local2(b', i', a', n', c', t') when b = b' ->
     eq_poly ids i i'; eq_poly ids a a'; eq_poly ids n n'; eq_mono ids c c';
     term_lift eq_poly ids t t'
-  | Local3(b, i, a, n, u, v, t),  Local3(b', i', a', n', u', v', t') when b = b' ->
+  | Local3(b, i, a, n, u, v, t), Local3(b', i', a', n', u', v', t')
+    when b = b' ->
     eq_poly ids i i'; eq_poly ids a a'; eq_poly ids n n'; eq_mono ids u u';
     eq_poly ids v v'; term_lift eq_poly ids t t'
   | Purify(c, m), Purify(c', m') -> eq_poly ids c c'; eq_mono ids m m'

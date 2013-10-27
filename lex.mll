@@ -91,7 +91,7 @@ let keyword_table =
     "yield", YIELD;
   ] in
   let tab = Hashtbl.create (List.length bindings) in
-  bindings |> List.iter (fun (a, b) -> Hashtbl.add tab a b);
+  List.iter (fun (a, b) -> Hashtbl.add tab a b) bindings;
   tab
 
 let int_of_hex c =

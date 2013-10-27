@@ -74,11 +74,11 @@ let parse_string str =
   a, b
 
 let parse_set str =
-  with_reporting (Printf.sprintf "Check set: %s" str)
-    Check_expr.set
-    initial_ctx
-    (parse_string' str)
-    |> ignore;
+  ignore (
+    with_reporting (Printf.sprintf "Check set: %s" str)
+      Check_expr.set
+      initial_ctx
+      (parse_string' str));
   maybe_print (Printf.sprintf "OK: success set '%s'\n" str)
 
 let _ = parse_string "(val x = true; x)"

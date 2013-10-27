@@ -90,9 +90,9 @@ let rec toplevel ctx = function
           "expected integer constant";
         raise Check_expr.Error
     in
-    let args' = args |> List.map (mapper ctx) |>
-        List.map Ipl_llvm.generic_of_imm |> Array.of_list
-    in
+    let args' = Array.of_list (
+      List.map Ipl_llvm.generic_of_imm (
+        List.map (mapper ctx) args)) in
     let expect' = mapper ctx expect in
     let fn = match Llvm_executionengine.ExecutionEngine.find_function
         f Ipl_llvm.main_engine

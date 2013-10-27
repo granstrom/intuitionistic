@@ -243,6 +243,10 @@ and check_infer (ctx:Ctx.ctx) (a_expr:expr) : check_infer =
   let genvar form i =
     dummy_of_pos (Printf.sprintf "%s%d" form i) (fst (range_of_expr a_expr))
   in
+  (* Use |-> instead of the standard |>, as the latter is defined in
+     4.01, but not in earlier versions, and I'd like to be sure that
+     there are no occurences of |> in the code. *)
+  let (|->) a b = b a in
   match a_expr with
   | Enum_cst (_, x) ->
     Polymorph(
@@ -518,15 +522,15 @@ and check_infer (ctx:Ctx.ctx) (a_expr:expr) : check_infer =
         let _J = mkFst www in
         let mkE x = Imm(Value.Enum_cst(_E, x)) in
         let _Cm = begin Base.Enum_set.elements _E
-            |> List.map (fun x -> (x, apv _C (mkE x)))
-            |> Base.enum_map_make
-            |> Base.Enum_map.add lit (mkFst _J)
+            |-> List.map (fun x -> (x, apv _C (mkE x)))
+            |-> Base.enum_map_make
+            |-> Base.Enum_map.add lit (mkFst _J)
         end in
         let _C' x = mkEnum_d x (Cst Type) _Cm in
         let _Rm = begin Base.Enum_set.elements _E
-            |> List.map (fun x -> (x, lambda(fun y -> mkApp _R (Pair(mkE x, y)))))
-            |> Base.enum_map_make
-            |> Base.Enum_map.add lit (lambda (mkApp (mkSnd _J)))
+            |-> List.map (fun x -> (x, lambda(fun y -> mkApp _R (Pair(mkE x, y)))))
+            |-> Base.enum_map_make
+            |-> Base.Enum_map.add lit (lambda (mkApp (mkSnd _J)))
         end in
         let fam _X = Fn (fun x -> univ (_X x)) in
         let _R' z = mkEnum_d2 z (fam _C') (Cst Type) _Rm in
@@ -540,9 +544,9 @@ and check_infer (ctx:Ctx.ctx) (a_expr:expr) : check_infer =
         (* ds(c) : fun(y:C'(c)) : I+J => R'(c, y)  *)
         let call a b = Invk(Pair(a, b), Fn(fun x -> Ret x)) in
         let ds = begin Base.Enum_set.elements _E
-            |> List.map (fun e -> e, lambda (fun y -> call left_cst (Pair(mkE e, y))))
-            |> Base.enum_map_make
-            |> Base.Enum_map.add lit (lambda (fun y -> call right_cst y))
+            |-> List.map (fun e -> e, lambda (fun y -> call left_cst (Pair(mkE e, y))))
+            |-> Base.enum_map_make
+            |-> Base.Enum_map.add lit (lambda (fun y -> call right_cst y))
         end in
         let _IJR p = Tree(_IplusJ, _R' p) in
         let body x = mkEnum_d2 x (fam _C') (Fn _IJR) ds in
@@ -583,7 +587,7 @@ and check_infer (ctx:Ctx.ctx) (a_expr:expr) : check_infer =
     let cs = checked_enum_map_make cs_list a_range in
     let cs_set = enum_of_enum_map cs in
     let fn = check ctx Eval.interface in
-    let ccs = cs |> Enum_map.map fn |> Enum_map.bindings in
+    let ccs = cs |-> Enum_map.map fn |-> Enum_map.bindings in
     (* TODO: use reflect instead. *)
     let x, unused = genvar "interface" 1, genvar "interface" 2 in
     let enum = Term.Mono(Term.Enum_u(cs_set)) in
@@ -605,7 +609,7 @@ and check_infer (ctx:Ctx.ctx) (a_expr:expr) : check_infer =
           let _CCC = Value.apv _C (Value.Imm(Value.Enum_cst (ds, k))) in
           check ctx _CCC c
 	in
-	let bs = cs |> Enum_map.mapi fn |> Enum_map.bindings in
+	let bs = cs |-> Enum_map.mapi fn |-> Enum_map.bindings in
 	let g = genvar "enum_d" in
 	let x1, x2 = g 1, g 2 in
 	let _C_x2 = Reify.set (Value.apv _C (Value.el_of_var x2)) in
@@ -666,7 +670,7 @@ and check_infer (ctx:Ctx.ctx) (a_expr:expr) : check_infer =
       | _, Polymorph(_) -> []
     in
     begin
-      match List.map extract_type bindings |> List.concat with
+      match List.map extract_type bindings |-> List.concat with
       | [] -> (* All branches are polymorphic. *)
         Polymorph(fun x -> Term.Mono(finish x))
       | (k, main) :: types ->
