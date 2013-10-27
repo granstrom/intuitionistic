@@ -1,17 +1,16 @@
 REQUIREMENTS:
 
-- Ocaml v4.01 or later.
-  Note that some package managers have slow to pick up this release.
-  It is available from http://caml.inria.fr/ocaml/release.en.html.
-  You can find the version of your release using 'ocamlc -v'.
-- LLVM 3.4 or later.
-- Ocaml-LLVM bindings.
+- Ocaml v4.00 or later.
+
+- LLVM 3.3 or later, installed with OCaml bindings. Easiest way to get
+  these is to build LLVM from source (after having installed OCaml).
+
 
 INSTALLATION:
 
-Type make in the main folder.
-This produces several binaries:
+Type 'make' in the IPL main folder.
 
+The default IPL Makefile target creates the following binaries.
 ./iplc      The iplc compiler.
 ./iplc.opt  An optimized version of the iplc compiler.
 ./iplctop   An Ocaml toplevel with iplc preloaded.

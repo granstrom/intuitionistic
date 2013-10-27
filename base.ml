@@ -110,7 +110,7 @@ let enum_map_equal (a : 'a enum_map) (b : 'b enum_map) (fn : 'a -> 'b -> bool)
     match x, y with
     | Some u, Some v when fn u v -> None
     | _ -> raise Not_found in
-  try Enum_map.merge fn a b |> ignore; true
+  try ignore (Enum_map.merge fn a b); true
   with Not_found -> false
 
 (* Returns true if the two maps have equal sets of keys *)

@@ -112,11 +112,9 @@ let pattern ctx _C patt val_opt =
     | P_enum_d (r, op, patts, var, _) ->
       var, P_enum_d (r, op, patts, var, true)
   in
-  let vvv =
-    val_opt |>
-        function
-        | None -> (Value.el_of_var var)
-        | Some x -> x
+  let vvv = match val_opt with
+    | None -> (Value.el_of_var var)
+    | Some x -> x
   in
   var, pattern' ctx _C vvv patt'
 

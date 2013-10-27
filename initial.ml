@@ -39,7 +39,9 @@ let mkstruct lst =
   lambda(fun x -> Eval.mkEnum_d x cod values), Pi(enum, cod)
 
 let builtin_struct lst =
-  lst |> List.map (fun (x, y) -> let v, t = Eval.builtin_val_type y in x, v, t) |> mkstruct
+  lst
+  |> List.map (fun (x, y) -> let v, t = Eval.builtin_val_type y in x, v, t)
+  |> mkstruct
 
 let mod_i name x =
   let open Value in
