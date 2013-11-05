@@ -32,13 +32,14 @@ OCAMLOPTFLAGS=$(INCLUDES) -p
 all: test_expr test_llvm iplc iplc.opt ipltop
 
 test: all
+	./test_term
 	./test_expr
 	./test_llvm
 	@for x in $$(ls examples/*.ipl); do echo "checking" $$x "done." && ./iplc $$x; done
 	@for x in $$(ls examples/*.ipl); do echo "checking (opt)" $$x "done." && ./iplc.opt $$x; done
 
 clean:
-	rm -f test_expr test_llvm iplc iplc.opt ipltop syntax.mli syntax.ml lex.ml
+	rm -f test_term test_expr test_llvm iplc iplc.opt ipltop syntax.mli syntax.ml lex.ml
 	rm -f *.cm[ioxa]
 	rm -f examples/*.bc
 	rm -f examples/*.s
