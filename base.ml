@@ -24,16 +24,14 @@ let rec try_find pred =
   | a :: rest when pred a -> Some a
   | _ :: rest -> try_find pred rest
 
-(* Variables are represented by strings. The empty string represents *)
-(* a special variable which can be mentioned as '_' (binding *)
-(* occurences), but which cannot be used (no bound occurences). *)
-(* Variables can normally not be rebound; though, the special variable *)
-(* '_', which is represented by the empty string, can be rebound any *)
-(* number of times. This is harmless as it can never be used. *)
-type var = Variable of string
+type var = Var.t
 
-let format_var : Format.formatter -> var -> unit =
-  fun f -> function Variable s -> Format.fprintf f "%s" s
+(* A variable map is a mapping from strings to things. *)
+module Var_map = Map.Make(struct
+  type t = var
+  let compare = compare
+end)
+type 'a var_map = 'a Var_map.t
 
 (* An enum literal. *)
 type enum_lit = Enum_lit of string
@@ -47,13 +45,6 @@ module Enum_map = Map.Make(struct
   let compare = compare
 end)
 type 'a enum_map = 'a Enum_map.t
-
-(* A variable map is a mapping from strings to things. *)
-module Var_map = Map.Make(struct
-  type t = var
-  let compare = compare
-end)
-type 'a var_map = 'a Var_map.t
 
 (* An enumeration is a set of strings. *)
 module Enum_set = Set.Make(
@@ -91,40 +82,17 @@ let rec enum_make : enum_lit list -> enum =
     if Enum_set.mem a bb then raise (Duplicate_key(a))
     else Enum_set.add a bb
 
-let enum_equal = Enum_set.equal
-let enum_subset = Enum_set.subset
-let enum_is_empty = Enum_set.is_empty
+let enum_of_enum_map mp =
+  Enum_map.fold (fun k _ b -> Enum_set.add k b) mp Enum_set.empty
 
-let enum_of_enum_map mp = enum_make (List.map fst (Enum_map.bindings mp))
-
-(* Returns true if the two maps have the same sets of keys, and the *)
-(* respective mappings of the keys are equal in sense of the supplied *)
-(* function. *)
-let enum_map_equal (a : 'a enum_map) (b : 'b enum_map) (fn : 'a -> 'b -> bool)
-    : bool =
-  let fn _ x y =
-    match x, y with
-    | Some u, Some v when fn u v -> None
-    | _ -> raise Not_found in
-  try ignore (Enum_map.merge fn a b); true
-  with Not_found -> false
-
-(* Returns true if the two maps have equal sets of keys *)
-(* (ignoring their values). *)
-let enum_map_equal_keys a b = enum_map_equal a b (fun _ _ -> true)
-
-let bool_true_lit = Enum_lit "true"
-let bool_false_lit = Enum_lit "false"
-let bool_enum = enum_make [bool_true_lit; bool_false_lit]
+let true_lit = Enum_lit "true"
+let false_lit = Enum_lit "false"
+let bool_enum = enum_make [true_lit; false_lit]
 
 let unit_lit = Enum_lit "()"
 let unit_enum = enum_make [unit_lit]
 
 let empty_enum = Enum_set.empty
-
-let left_lit = Enum_lit "left"
-let right_lit = Enum_lit "right"
-let plus_enum = enum_make [ left_lit; right_lit ]
 
 (* Raised when an explicit presupposition for the invocation of a *)
 (* method has beed violated. *)
@@ -133,22 +101,24 @@ exception Presupposition_error
 (* The type of positions (line, col). *)
 type pos = int * int
 
+let no_pos = -1, -1
+
 (* The type of ranges, i.e., two position: from, to. *)
 type range = pos * pos
+
+let no_range = no_pos, no_pos
 
 (* The type of source file locations. *)
 type location = string * range
 
-(* Extend a range with a position. *)
-let merge_range_with_pos (p, q) r = min p r, max q r
+let no_location = "", no_range
 
-(* Merge two ranges. *)
-let merge_ranges (p, q) (r, s) = min p r, max q s
+(* Type of variable binding patterns. *)
+type pattern =
+| Pvar of location * var
+| Ppair of pattern * pattern
 
-(* Create a dummy variable from a description (maybe empty) and a position. *)
-let dummy_of_pos (form:string) ((p, q):pos) =
-  Variable (Printf.sprintf "#%s:%d.%d:" form p q)
-
+let no_pattern = Pvar(no_location, Var.no)
 
 let format_range(fmt:Format.formatter) (((p, q), (r, s)):range) =
   if p = r then
@@ -159,23 +129,67 @@ let format_range(fmt:Format.formatter) (((p, q), (r, s)):range) =
   else
     Format.fprintf fmt "%d.%d-%d.%d" p q r s
 
-let file_and_range (form:string) (((p, q), (r, s)):range) =
-  if p = r then
-    if q = s then
-      Printf.sprintf "%s:%d.%d" form p q
-    else
-      Printf.sprintf "%s:%d.%d-%d" form p q s
-  else
-    Printf.sprintf "%s:%d.%d-%d.%d" form p q r s
+let format_location(fmt:Format.formatter) ((l,r):location) =
+  Format.fprintf fmt "%s:%a" l format_range r
 
-(* Create a dummy variable from a description (maybe empty) and a range. *)
-let dummy_of_file_and_range (form:string) (r:range) =
-  Variable (file_and_range form r)
+let no_loc_pattern (x:var) = Pvar(no_location, x)
 
-(* Create a new dummy variable. *)
-let newdummy : unit -> var =
-  let counter = ref 1 in
-  fun () ->
-    let result = Variable (Format.sprintf "#d%d" !counter) in
-    counter := !counter + 1;
-    result
+(* Raised when an equality check between values fails. *)
+exception Not_equal
+
+type i8 = char
+type i16 = int
+type i32 = int32
+type i64 = int64
+
+type size =
+| I8
+| I16
+| I32
+| I64
+
+type builtin =
+| Aeq of size
+| Less of size
+(* TODO: add Greater, Below, Above, Less_eq, Greater_eq, Below_eq, Above_eq. *)
+| Add of size
+| Sub of size
+| Neg of size
+| Mul of size
+| Xor of size
+| Or of size
+| And of size
+| Not of size
+| Lsl of size
+| Lsr of size
+| Asr of size
+| Sdiv of size
+| Srem of size
+| Cast of size * size
+| Less_trans of size
+| Less_antisym of size
+| Aeq_prop of size
+| Aeq_refl of size
+| Add_commutative of size
+| Add_associative of size
+| Add_unit of size
+| Add_inverse of size
+| Mul_commutative of size
+| Mul_associative of size
+| Mul_unit of size
+| Distributive of size
+| Sub_axiom of size
+
+type imm =
+| Imm8 of i8
+| Imm16 of i16
+| Imm32 of i32
+| Imm64 of i64
+| Enum_imm of enum * enum_lit
+| Refl
+
+let true_imm = Enum_imm (bool_enum, true_lit)
+let false_imm = Enum_imm (bool_enum, false_lit)
+let unit_imm = Enum_imm (unit_enum, unit_lit)
+
+let bool_of_bool x = if x then true_imm else false_imm

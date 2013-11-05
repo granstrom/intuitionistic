@@ -316,11 +316,6 @@ assert fun(i) print_int.call(i) =
 is i32 -> systemX => void;
 
 
-// A program over the interface writer(A) => void can be viewed as a
-// sequence of A's. In particular, writer(i32) => void is a sequence
-// of integers. IPL has a special notation for sequences of integers:
-assert 10 .. 100 is writer(i32) => void;
-
 // For loops are often used in conjuction with ranges.
 val fun systemX_example(x i32) systemX => void = block {
   for y in 0 .. x {

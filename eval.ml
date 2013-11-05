@@ -14,114 +14,106 @@
 (* See the License for the specific language governing permissions and        *)
 (* limitations under the License.                                             *)
 
+open Base
+
 (* === Dealing with built-in functions. === *)
 
 let mkbinop int int32 int64 =
-  let open Value in
   function
   | I8 -> begin
     function [Imm8 xx; Imm8 yy] -> Imm8 (Char.chr (int (Char.code xx) (Char.code yy)))
-    | _ -> raise Base.Presupposition_error
+    | _ -> raise Presupposition_error
   end
   | I16 -> begin
     function [Imm16 xx; Imm16 yy] -> Imm16 (int xx yy)
-    | _ -> raise Base.Presupposition_error
+    | _ -> raise Presupposition_error
   end
   | I32 -> begin
     function [Imm32 xx; Imm32 yy] -> Imm32 (int32 xx yy)
-    | _ -> raise Base.Presupposition_error
+    | _ -> raise Presupposition_error
   end
   | I64 -> begin
     function [Imm64 xx; Imm64 yy] -> Imm64 (int64 xx yy)
-    | _ -> raise Base.Presupposition_error
+    | _ -> raise Presupposition_error
   end
 
 let mkunop int int32 int64 =
-  let open Value in
   function
   | I8 -> begin
     function [Imm8 xx] -> Imm8 (Char.chr (int (Char.code xx)))
-    | _ -> raise Base.Presupposition_error
+    | _ -> raise Presupposition_error
   end
   | I16 -> begin
     function [Imm16 xx] -> Imm16 (int xx)
-    | _ -> raise Base.Presupposition_error
+    | _ -> raise Presupposition_error
   end
   | I32 -> begin
     function [Imm32 xx] -> Imm32 (int32 xx)
-    | _ -> raise Base.Presupposition_error
+    | _ -> raise Presupposition_error
   end
   | I64 -> begin
     function [Imm64 xx] -> Imm64 (int64 xx)
-    | _ -> raise Base.Presupposition_error
+    | _ -> raise Presupposition_error
   end
 
-let bool_of_bool x =
-  let open Value in
-  Enum_cst(Base.bool_enum,
-           if x then Base.bool_true_lit else Base.bool_false_lit)
-
 let mkbinrel int int32 int64 =
-  let open Value in
   function
   | I8 -> begin
     function [Imm8 xx; Imm8 yy] ->
       bool_of_bool (int (Char.code xx) (Char.code yy))
-    | _ -> raise Base.Presupposition_error
+    | _ -> raise Presupposition_error
   end
   | I16 -> begin
     function [Imm16 xx; Imm16 yy] -> bool_of_bool (int xx yy)
-    | _ -> raise Base.Presupposition_error
+    | _ -> raise Presupposition_error
   end
   | I32 -> begin
     function [Imm32 xx; Imm32 yy] -> bool_of_bool (int32 xx yy)
-    | _ -> raise Base.Presupposition_error
+    | _ -> raise Presupposition_error
   end
   | I64 -> begin
     function [Imm64 xx; Imm64 yy] -> bool_of_bool (int64 xx yy)
-    | _ -> raise Base.Presupposition_error
+    | _ -> raise Presupposition_error
   end
 
 let mkshift int int32 int64 =
-  let open Value in
   function
   | I8 -> begin
     function [Imm8 xx; Imm8 yy] ->
       Imm8 (Char.chr (int (Char.code xx) (Char.code yy land 0x07)))
-    | _ -> raise Base.Presupposition_error
+    | _ -> raise Presupposition_error
   end
   | I16 -> begin
     function [Imm16 xx; Imm8 yy] -> Imm16 (int xx (Char.code yy land 0x0f))
-    | _ -> raise Base.Presupposition_error
+    | _ -> raise Presupposition_error
   end
   | I32 -> begin
     function [Imm32 xx; Imm8 yy] -> Imm32 (int32 xx (Char.code yy land 0x1f))
-    | _ -> raise Base.Presupposition_error
+    | _ -> raise Presupposition_error
   end
   | I64 -> begin
     function [Imm64 xx; Imm8 yy] -> Imm64 (int64 xx (Char.code yy land 0x3f))
-    | _ -> raise Base.Presupposition_error
+    | _ -> raise Presupposition_error
   end
 
 let mkdivrem int int32 int64 =
-  let open Value in
   function
   | I8 -> begin
     function [Imm8 xx; Imm8 yy; Refl] ->
       Imm8 (Char.chr (int (Char.code xx) (Char.code yy)))
-    | _ -> raise Base.Presupposition_error
+    | _ -> raise Presupposition_error
   end
   | I16 -> begin
     function [Imm16 xx; Imm16 yy; Refl] -> Imm16 (int xx yy)
-    | _ -> raise Base.Presupposition_error
+    | _ -> raise Presupposition_error
   end
   | I32 -> begin
     function [Imm32 xx; Imm32 yy; Refl] -> Imm32 (int32 xx yy)
-    | _ -> raise Base.Presupposition_error
+    | _ -> raise Presupposition_error
   end
   | I64 -> begin
     function [Imm64 xx; Imm64 yy; Refl] -> Imm64 (int64 xx yy)
-    | _ -> raise Base.Presupposition_error
+    | _ -> raise Presupposition_error
   end
 
 let aeqrel = mkbinrel (=) (=) (=)
@@ -139,75 +131,78 @@ let lsrop = mkshift (lsr) Int32.shift_right_logical Int64.shift_right_logical
 let asrop = mkshift (asr) Int32.shift_right Int64.shift_right
 let sdivop = mkdivrem (/) Int32.div Int64.div
 let sremop = mkdivrem (mod) Int32.rem Int64.rem
-let sextop a b =
+let castop a b =
   let open Value in
   match a, b with
   | aa, bb when aa = bb -> begin function [x] -> x
-    | _ -> raise Base.Presupposition_error end
+    | _ -> raise Presupposition_error end
   (* Sign extensions. *)
   | I8, I16 -> begin function [Imm8 yy] -> Imm16(Char.code yy)
-    | _ -> raise Base.Presupposition_error end
+    | _ -> raise Presupposition_error end
   | I8, I32 -> begin function [Imm8 yy] -> Imm32(Int32.of_int (Char.code yy))
-    | _ -> raise Base.Presupposition_error end
+    | _ -> raise Presupposition_error end
   | I8, I64 -> begin function [Imm8 yy] -> Imm64(Int64.of_int (Char.code yy))
-    | _ -> raise Base.Presupposition_error end
+    | _ -> raise Presupposition_error end
   | I16, I32 -> begin function [Imm16 yy] -> Imm32(Int32.of_int yy)
-    | _ -> raise Base.Presupposition_error end
+    | _ -> raise Presupposition_error end
   | I16, I64 -> begin function [Imm16 yy] -> Imm64(Int64.of_int yy)
-    | _ -> raise Base.Presupposition_error end
+    | _ -> raise Presupposition_error end
   | I32, I64 -> begin function [Imm32 yy] -> Imm64(Int64.of_int32 yy)
-    | _ -> raise Base.Presupposition_error end
+    | _ -> raise Presupposition_error end
   (* Truncations. *)
-  | I16, I8 -> begin function [Imm16 yy] -> Imm8(Char.chr yy)
-    | _ -> raise Base.Presupposition_error end
-  | I32, I8 -> begin function [Imm32 yy] -> Imm8(Char.chr (Int32.to_int yy))
-    | _ -> raise Base.Presupposition_error end
-  | I64, I8 -> begin function [Imm64 yy] -> Imm8(Char.chr (Int64.to_int yy))
-    | _ -> raise Base.Presupposition_error end
+  | I16, I8 -> begin function [Imm16 yy] -> Imm8(Char.chr (yy land 255))
+    | _ -> raise Presupposition_error end
+  | I32, I8 -> begin function [Imm32 yy] -> Imm8(Char.chr (Int32.to_int yy land 255))
+    | _ -> raise Presupposition_error end
+  | I64, I8 -> begin function [Imm64 yy] -> Imm8(Char.chr (Int64.to_int yy land 255))
+    | _ -> raise Presupposition_error end
   | I32, I16 -> begin function [Imm32 yy] -> Imm16(Int32.to_int yy)
-    | _ -> raise Base.Presupposition_error end
+    | _ -> raise Presupposition_error end
   | I64, I16 -> begin function [Imm64 yy] -> Imm16(Int64.to_int yy)
-    | _ -> raise Base.Presupposition_error end
+    | _ -> raise Presupposition_error end
   | I64, I32 -> begin function [Imm64 yy] -> Imm32(Int64.to_int32 yy)
-    | _ -> raise Base.Presupposition_error end
-  | _ -> raise Base.Presupposition_error
+    | _ -> raise Presupposition_error end
+  | _ -> raise Presupposition_error
 
 let constantly_refl n xs =
-  if List.length xs <> n then raise Base.Presupposition_error;
-  Value.Refl
+  if List.length xs <> n then raise Presupposition_error;
+  Refl
 
-let evalBuiltin : Value.builtin -> Value.imm list -> Value.imm =
+let evalBuiltin : builtin -> imm list -> imm =
   let open Value in
   function
-  | Aeq a -> aeqrel a
+  | Aeq a  -> aeqrel a
   | Less a -> lessrel a
-  | Add a -> addop a
-  | Sub a -> subop a
-  | Neg a -> negop a
-  | Mul a -> mulop a
-  | Xor a -> xorop a
-  | Ior a -> iorop a
-  | And a -> andop a
-  | Not a -> notop a
-  | Lsl a -> lslop a
-  | Lsr a -> lsrop a
-  | Asr a -> asrop a
+  | Add a  -> addop a
+  | Sub a  -> subop a
+  | Neg a  -> negop a
+  | Mul a  -> mulop a
+  | Xor a  -> xorop a
+  | Or a   -> iorop a
+  | And a  -> andop a
+  | Not a  -> notop a
+  | Lsl a  -> lslop a
+  | Lsr a  -> lsrop a
+  | Asr a  -> asrop a
   | Sdiv a -> sdivop a
   | Srem a -> sremop a
-  | Sext (a, b) -> sextop a b
-  | LessTrans _ -> constantly_refl 5
-  | LessAntisym _ -> constantly_refl 1
-  | AeqProp _ -> constantly_refl 3
-  | AeqRefl _ -> constantly_refl 1
-  | AddCommutative _ -> constantly_refl 2
-  | AddAssociative _ -> constantly_refl 3
-  | AddUnit _ -> constantly_refl 1
-  | AddInverse _ -> constantly_refl 1
-  | MulCommutative _ -> constantly_refl 2
-  | MulAssociative _ -> constantly_refl 3
-  | MulUnit _ -> constantly_refl 1
+  | Cast (a, b) -> castop a b
+  | Less_trans _ -> constantly_refl 5
+  | Less_antisym _ -> constantly_refl 1
+  | Aeq_prop _ -> constantly_refl 3
+  | Aeq_refl _ -> constantly_refl 1
+  | Add_commutative _ -> constantly_refl 2
+  | Add_associative _ -> constantly_refl 3
+  | Add_unit _ -> constantly_refl 1
+  | Add_inverse _ -> constantly_refl 1
+  | Mul_commutative _ -> constantly_refl 2
+  | Mul_associative _ -> constantly_refl 3
+  | Mul_unit _ -> constantly_refl 1
   | Distributive _ -> constantly_refl 3
-  | SubAxiom _ -> constantly_refl 2
+  | Sub_axiom _ -> constantly_refl 2
+
+
+
 
 (* === Preparation for definition of eval. === *)
 
@@ -215,66 +210,77 @@ let mkApp f a =
   match f with
   | Value.Lambda ff -> Value.apv ff a
   | Value.Neut n -> Value.Neut(Value.App(n, a))
-  | _ -> raise Base.Presupposition_error
+  | Value.Hole -> Value.Hole
+  | _ -> raise Presupposition_error
 
 (*
    n : enum { c1; ...; cn } (= E)
    C : E -> set
    cs[ci] : C(ci)
 *)
-let mkEnum_d n _C cs =
+let mkEnum_d n _C (cs:Value.el Lazy.t enum_map) =
   match n with
-  | Value.Neut m -> Value.Neut(Value.Enum_d(m, _C, cs))
-  | Value.Imm(Value.Enum_cst(ds, s)) when Base.enum_equal ds (Base.enum_of_enum_map cs) ->
+  | Value.Imm(Enum_imm(ds, s)) ->
+    assert(let cs' = enum_of_enum_map cs in Enum_set.equal ds cs');
     begin
-      try Base.Enum_map.find s cs
-      with Not_found -> raise Base.Presupposition_error
+      try Lazy.force (Enum_map.find s cs)
+      with Not_found -> raise Presupposition_error
     end
-  | _ -> raise Base.Presupposition_error
+  | Value.Neut m -> Value.Neut(Value.Enum_d(m, _C, cs))
+  | Value.Hole -> Value.Hole
+  | _ -> raise Presupposition_error
 
 let mkFst =
   function
-  | Value.Neut m -> Value.Neut(Value.Fst m)
   | Value.Pair(a, _) -> a
-  | _ -> raise Base.Presupposition_error
+  | Value.Neut m -> Value.Neut(Value.Fst m)
+  | Value.Hole -> Value.Hole
+  | _ -> raise Presupposition_error
 
 let mkSnd =
   function
-  | Value.Neut m -> Value.Neut(Value.Snd m)
   | Value.Pair(_, b) -> b
-  | _ -> raise Base.Presupposition_error
+  | Value.Neut m -> Value.Neut(Value.Snd m)
+  | Value.Hole -> Value.Hole
+  | _ -> raise Presupposition_error
 
 let mkSubst r _C d =
   match r with
+  | Value.Imm Refl -> d
   | Value.Neut m -> Value.Neut(Value.Subst(m, _C, d))
-  | Value.Imm Value.Refl -> d
-  | _ -> raise Base.Presupposition_error
+  | Value.Hole -> Value.Hole
+  | _ -> raise Presupposition_error
 
 let rec mkBuiltin p imms_rev =
   function
   | [] -> Value.Imm(evalBuiltin p (List.rev imms_rev))
-  | Value.Neut n :: rs -> Value.Neut(Value.Builtin(p, List.rev imms_rev, n, rs))
   | Value.Imm imm :: rs -> mkBuiltin p (imm :: imms_rev) rs
-  | _ -> raise Base.Presupposition_error
+  | Value.Neut n :: rs -> Value.Neut(Value.Builtin(p, List.rev imms_rev, n, rs))
+  | Value.Hole :: _ -> Value.Hole
+  | _ -> raise Presupposition_error
 
 let rec mkRange_ n m =
+  let open Value in
+  (* TODO: should be unsigned <. *)
   if n < m then
-    Value.Invk(Value.Imm(Value.Imm32 n),
-	       Value.Cst(mkRange_ (Int32.add n Int32.one) m))
+    Invk(Imm(Imm32 n), Fn(fun _ -> mkRange_ (Int32.add n Int32.one) m))
   else
-    Value.Ret Value.unit_cst
+    Ret unit_cst
 
 let mkRange n m =
+  let open Value in
   match n with
-  | Value.Neut nn -> Value.Neut(Value.Range1(nn, m))
-  | Value.Imm(Value.Imm32 nn) ->
+  | Imm(Imm32 nn) ->
     begin
       match m with
-      | Value.Neut mm -> Value.Neut(Value.Range2(nn, mm))
-      | Value.Imm(Value.Imm32 mm) -> mkRange_ nn mm
-      | _ -> raise Base.Presupposition_error
+      | Imm(Imm32 mm) -> mkRange_ nn mm
+      | Neut mm -> Neut(Range2(nn, mm))
+      | Hole -> Hole
+      | _ -> raise Presupposition_error
     end
-  | _ -> raise Base.Presupposition_error
+  | Neut nn -> Neut(Range1(nn, m))
+  | Hole -> Hole
+  | _ -> raise Presupposition_error
 
 (*
    p : I => A
@@ -296,11 +302,12 @@ let mkRange n m =
 let rec mkBind n _B f : Value.el =
   let open Value in
   match n with
-  | Neut m -> Neut(Bind(m, _B, f))
   | Ret a -> apv f a
   | Invk(c, Cst t) -> Invk(c, Cst(mkBind t _B f))
   | Invk(c, Fn t) -> Invk(c, Fn(fun x -> mkBind (t x) _B f))
-  | _ -> raise Base.Presupposition_error
+  | Neut m -> Neut(Bind(m, _B, f))
+  | Hole -> Hole
+  | _ -> raise Presupposition_error
 
 (*
    for _ in yield(a) { body }     = yield(a)
@@ -309,11 +316,14 @@ let rec mkBind n _B f : Value.el =
 let rec mkFor n _U _I body =
   let open Value in
   match n with
-  | Neut m -> Neut(For(m, _U, _I, body))
   | Ret a -> Ret a
-  | Invk(c, Cst t) -> mkBind (apv body c) (apv _U c) (Cst(mkFor t _U _I body))
-  | Invk(c, Fn t) -> mkBind (apv body c) (apv _U c) (Fn(fun x -> mkFor (t x) _U _I body))
-  | _ -> raise Base.Presupposition_error
+  | Invk(c, Cst t) ->
+    mkBind (apv body c) (apv _U c) (Cst(mkFor t _U _I body))
+  | Invk(c, Fn t) ->
+    mkBind (apv body c) (apv _U c) (Fn(fun x -> mkFor (t x) _U _I body))
+  | Neut m -> Neut(For(m, _U, _I, body))
+  | Hole -> Hole
+  | _ -> raise Presupposition_error
 
 (*
 local(c, r, a, n, yield(x)) = x
@@ -322,43 +332,86 @@ local(c, r, a, n, ({ val x = do left(t); v(x)})) = ({ val x = do t; local(c, r, 
 
 local(c, r, a, n, ({ val x = do right(t); v(x) })) = local(c, r, a, t(n), v(t(n)))
 *)
-let rec mkLocal1 st i a n p =
-  match p with
-  | Value.Neut q -> Value.Neut(Value.Local1(st, i, a, n, q))
-  | Value.Ret a -> Value.Ret a
-  | Value.Invk(u, v) -> mkLocal2 st i a n u v
-  | _ -> raise Base.Presupposition_error
-and mkLocal2 st i a n u v =
-  match u with
-  | Value.Neut u' -> Value.Neut(Value.Local2(st, i, a, n, u', v))
-  | Value.Pair(s, t) -> mkLocal3 st i a n s t v
-  | _ -> raise Base.Presupposition_error
-and mkLocal3 st i a n s t v =
+let rec mkLocal st i a n p =
   let open Value in
-  match s with
-  | Neut s' -> Neut(Local3(st, i, a, n, s', t, v))
-  | Imm(Value.Enum_cst(e, l)) when e = Base.plus_enum ->
-    begin
-      match l with
-      | w when w = Base.left_lit ->
-	let vv = Fn(fun x -> mkLocal1 st i a n (apv v x)) in
-	Invk(t, vv)
-      | w when w = Base.right_lit ->
+  let rec comp1 = function
+    | Ret a -> Ret a
+    | Invk(u, v) -> comp2 u v
+    | Neut q -> Neut(Local(st, i, a, n, Component1 q))
+    | Hole -> Hole
+    | _ -> raise Presupposition_error
+  and comp2 u v =
+    match u with
+    | Pair(s, t) -> comp3 s t v
+    | Neut u' -> Neut(Local(st, i, a, n, Component2(u', v)))
+    | Hole -> Hole
+    | _ -> raise Presupposition_error
+  and comp3 s t v =
+    match s with
+    | Imm(Enum_imm(e, l)) when e = bool_enum ->
+      begin
+        match l with
+        | w when w = false_lit ->
+	  let vv = Fn(fun x -> comp1 (apv v x)) in
+	  Invk(t, vv)
+        | w when w = true_lit ->
 	  let new_n = mkApp t n in
-	  mkLocal1 st i a new_n (apv v new_n)
-      | _ -> raise Base.Presupposition_error
-    end
-  | _ -> raise Base.Presupposition_error
+	  mkLocal st i a new_n (apv v new_n)
+        | _ -> raise Presupposition_error
+      end
+    | Neut s' -> Neut(Local(st, i, a, n, Component3(s', t, v)))
+    | Hole -> Hole
+    | _ -> raise Presupposition_error
+  in
+  comp1 p
 
-type assign =
-  | Nil
-  | Assign of assign * Base.var * Value.el
+let rec mkCatch b i a f p =
+  let open Value in
+  let rec comp1 = function
+    | Ret a -> Ret a
+    | Invk(u, v) -> comp2 u v
+    | Neut q -> Neut(Catch(b, i, a, f, Component1 q))
+    | Hole -> Hole
+    | _ -> raise Presupposition_error
+  and comp2 u v =
+    match u with
+    | Pair(s, t) -> comp3 s t v
+    | Neut u' -> Neut(Catch(b, i, a, f, Component2(u', v)))
+    | Hole -> Hole
+    | _ -> raise Presupposition_error
+  and comp3 s t v =
+    match s with
+    | Imm(Enum_imm(e, l)) when e = bool_enum ->
+      begin
+        match l with
+        | w when w = false_lit ->
+	  let vv = Fn(fun x -> comp1 (apv v x)) in
+	  Invk(t, vv)
+        | w when w = true_lit -> mkApp f t
+        | _ -> raise Presupposition_error
+      end
+    | Neut s' -> Neut(Catch(b, i, a, f, Component3(s', t, v)))
+    | Hole -> Hole
+    | _ -> raise Presupposition_error
+  in
+  comp1 p
+
+(* === Definition of eval. === *)
+
+type assign = Value.el var_map
+
+let rec extend (rho:assign) (el:Value.el) = function
+  | Pvar (_, x) -> Var_map.add x el rho
+  | Ppair (a, b) ->
+    extend (extend rho (mkFst el) a) (mkSnd el) b
 
 let lift(fn : assign -> 'a -> 'b) : assign -> 'a Term.fn -> 'b Value.fn =
-  fun rho -> fun(p, a) ->
-    match p with
-    | Base.Variable "" -> Value.Cst(fn rho a)
-    | x -> Value.Fn(fun xx -> fn (Assign(rho, x, xx)) a)
+  let fn rho (p, a) =
+    if p = no_pattern then
+      Value.Cst(fn rho a)
+    else
+      Value.Fn(fun x -> fn (extend rho x p) a)
+  in fn
 
 let rec set(rho : assign) : Term.set -> Value.set =
   let open Term in
@@ -370,8 +423,8 @@ let rec set(rho : assign) : Term.set -> Value.set =
   | Enum a -> Value.Enum a
   | Imm_set a -> Value.Imm_set a
   | Type -> Value.Type
+  | Hole_set -> Value.Hole_set
   | T e -> univ (poly rho e)
-  | BetaSet(a, b) -> Value.apv (lift set rho b) (mono rho a)
 
 and univ : Value.el -> Value.set =
   let open Value in
@@ -383,7 +436,8 @@ and univ : Value.el -> Value.set =
   | Enum_u a -> Enum a
   | Imm_set_u a-> Imm_set a
   | Neut x -> T x
-  | _ -> raise Base.Presupposition_error
+  | Hole -> Hole_set
+  | _ -> raise Presupposition_error
 
 and poly(rho : assign) : Term.poly -> Value.el =
   let open Term in
@@ -393,7 +447,8 @@ and poly(rho : assign) : Term.poly -> Value.el =
   | Pair(a, b) -> Value.Pair(poly rho a, poly rho b)
   | Ret a -> Value.Ret(poly rho a)
   | Invk(c, t) -> Value.Invk(poly rho c, lift poly rho t)
-  | BetaPoly(a, b) -> Value.apv (lift poly rho b) (mono rho a)
+  | Beta_poly(a, b) -> Value.apv (lift poly rho b) (mono rho a)
+  | Hole -> Value.Hole
 
 and mono(rho : assign) : Term.mono -> Value.el =
   let open Term in
@@ -407,78 +462,83 @@ and mono(rho : assign) : Term.mono -> Value.el =
   | Imm_set_u a -> Value.Imm_set_u a
   | Poly(e, _) -> poly rho e
   | Var x ->
-    let rec lookup x =
-      function
-      | Nil -> raise Base.Presupposition_error
-      | Assign(_, y, v) when x = y -> v
-      | Assign(rest, _, _) -> lookup x rest
-    in
-    lookup x rho
+    (try Var_map.find x rho with Not_found -> raise Presupposition_error)
   | App(f, a) -> mkApp (mono rho f) (poly rho a)
   | Fst(n) -> mkFst (mono rho n)
   | Snd(n) -> mkSnd (mono rho n)
   | Enum_d(n, _C, cs) -> mkEnum_d (mono rho n) (lift set rho _C)
-    (Base.Enum_map.map (poly rho) (Base.enum_map_make cs))
+    (Enum_map.map (fun x -> lazy (poly rho x)) cs)
   | Range(n, m) -> mkRange (poly rho n) (poly rho m)
   | Subst(r, _C, d) -> mkSubst (mono rho r)
-    ((Base.comp lift lift) set rho _C) (poly rho d)
+    ((comp lift lift) set rho _C) (poly rho d)
   | Builtin(p, rs) -> mkBuiltin p [] (List.map (poly rho) rs)
   | For(n, _U, _I, f) -> mkFor (mono rho n) (lift poly rho _U)
     (poly rho _I) (lift poly rho f)
   | Bind(n, _B, f) -> mkBind (mono rho n) (poly rho _B) (lift poly rho f)
-  | Local1(st, i, a, n, p) -> mkLocal1 st (poly rho i) (poly rho a)
-    (poly rho n) (mono rho p)
-  | Local2(st, i, a, n, u, v) -> mkLocal2 st (poly rho i) (poly rho a)
-    (poly rho n) (mono rho u) (lift poly rho v)
-  | Local3(st, i, a, n, e, d, v) -> mkLocal3 st (poly rho i) (poly rho a)
-    (poly rho n) (mono rho e) (poly rho d) (lift poly rho v)
-  | Purify(c, m) -> mkPurify (poly rho c) (mono rho m)
-  | BetaMono(a, b) -> Value.apv (lift mono rho b) (mono rho a)
+  | Local(st, i, a, n, p) ->
+    mkLocal st (poly rho i) (poly rho a) (poly rho n) (poly rho p)
+  | Catch(b, i, a, n, p) ->
+    mkCatch (poly rho b) (poly rho i) (poly rho a) (poly rho n) (poly rho p)
+  | Purify(c, m) -> mkPurify (poly rho c) (poly rho m)
+  | Beta_mono(a, b) -> Value.apv (lift mono rho b) (mono rho a)
 
+(* mkPurify requires univ, so it has to go here. *)
 and mkPurify c =
   let open Value in
   function
-  | Neut n -> Neut(Purify (c, n))
   | Ret a -> a
-  | Invk (d, _) -> mkEnum_d (mkFst d) (Cst (univ c)) Base.Enum_map.empty
-  | _ -> raise Base.Presupposition_error
+  | Invk (d, _) -> mkEnum_d (mkFst d) (Cst (univ c)) Enum_map.empty
+  | Neut n -> Neut(Purify (c, n))
+  | Hole -> Hole
+  | _ -> raise Presupposition_error
 
-let interface_fn = Value.Fn(fun x -> Value.Pi(univ x, Value.Cst Value.Type))
+
+
+
+
+
+
+
+
+(* TODO: Move to initial.ml? *)
+
+let interface_fn =
+  Value.Fn(fun x -> Value.Pi(univ x, Value.Cst Value.Type))
 let interface = Value.Sigma(Value.Type, interface_fn)
 let interface_sum_type =
   let open Value in
   Pi(Type, Fn(fun _A -> Pi(Pi(univ _A, Cst interface), Cst interface)))
-(*
-   lam(A:type) { lam(B:A->interface) {
-   (union(x:A):fst(B(x)), lam(z) { snd(B(fst(z)))(snd(z)) })
-   }}
-*)
+
+let lambda f = Value.Lambda(Value.Fn(f))
+let lambdac b = Value.Lambda(Value.Cst(b))
+
 let interface_sum =
   let open Value in
   lambda(fun _A -> lambda(fun _B ->
     let _C = Sigma_u(_A, Fn(fun x -> mkFst (mkApp _B x))) in
     Pair(_C, lambda(fun z ->  mkApp (mkSnd (mkApp _B (mkFst z))) (mkSnd z)))))
 
-let abort t x = mkEnum_d x (Value.Cst t) Base.Enum_map.empty
+let abort t x = mkEnum_d x (Value.Cst t) Enum_map.empty
 let empty_interface =
   let open Value in
-  Pair(Sigma_u(empty_u, Fn(abort Type)), lambda(fun x -> abort Type (mkFst x)))
+  Pair(Sigma_u(empty_u, Fn(abort Type)),
+       lambda(fun x -> abort Type (mkFst x)))
 
 let methods is_list =
-  let is = Base.enum_map_make is_list in
-  let is_set = Base.enum_of_enum_map is in
+  let is = enum_map_make is_list in
+  let is_set = enum_of_enum_map is in
   let i_fam x = mkEnum_d x (Value.Cst interface) is in
-  mkApp (mkApp interface_sum (Value.Enum_u is_set)) (Value.lambda i_fam)
+  mkApp (mkApp interface_sum (Value.Enum_u is_set)) (lambda i_fam)
 
 let interface_plus a b =
   methods [
-    Base.left_lit, a;
-    Base.right_lit, b
+    false_lit, lazy a;
+    true_lit, lazy b
   ]
 
 let ref_interface st =
   let ss = (Value.Imm_set_u st) in
-  Value.Pair(Value.Pi_u(ss, Value.Cst ss), Value.lambdac ss)
+  Value.Pair(Value.Pi_u(ss, Value.Cst ss), lambdac ss)
 
 let ref_type =
   let open Value in
@@ -493,10 +553,32 @@ let new_ref st =
     lambda(fun i ->
       lambda(fun a ->
         Pair(ref_interface st, lambda(fun p ->
-          mkLocal1 st i a n p)))))
+          mkLocal st i a n p)))))
 
 let new_ref_type st =
   Value.Pi(Value.Imm_set st, Value.Cst(ref_type))
+
+let catch_interface _B =
+  let open Value in
+  Pair(_B, Lambda(Cst(empty_u)))
+
+let catch_type =
+  let open Value in
+  Pi(Type, Fn(fun b ->
+    Pi(interface, Fn(fun i ->
+      Pi(Type, Fn(fun a ->
+        Pi(Pi(univ b, Cst(Tree(i, a))), Cst(
+          Pi(Tree(interface_plus i (catch_interface b), a),
+             Cst(Tree(i, a)))))))))))
+
+let catch_val =
+  let open Value in
+  lambda(fun b ->
+    lambda(fun i ->
+      lambda(fun a ->
+        lambda(fun f ->
+          lambda(fun p ->
+            mkCatch b i a f p)))))
 
 (*
   Given
@@ -515,7 +597,7 @@ let dot_type
   let open Value in
   Pi(univ _A, Fn(fun x ->
     let _Bx = apv _B x in
-    let _Cx =  Value.lambda(fun y -> mkApp _C (Pair(x, y))) in
+    let _Cx =  lambda(fun y -> mkApp _C (Pair(x, y))) in
     Pi(Tree(Pair(_Bx, _Cx), _D),
        Cst(Tree(Pair(Sigma_u(_A, _B), _C), _D)))))
 let dot
@@ -563,19 +645,19 @@ let one_of_size =
 let aeq a x y =
   let open Value in
   Id_u(bool_u,
-       mkBuiltin (Value.Aeq a) [] [x; y],
+       mkBuiltin (Aeq a) [] [x; y],
        true_cst)
 
 let less a x y =
   let open Value in
   Id_u(bool_u,
-       mkBuiltin (Value.Less a) [] [x; y],
+       mkBuiltin (Less a) [] [x; y],
        true_cst)
 
 let not_less a x y =
   let open Value in
   Id_u(bool_u,
-       mkBuiltin (Value.Less a) [] [x; y],
+       mkBuiltin (Less a) [] [x; y],
        false_cst)
 
 let positive a y = less a (Value.Imm(zero_of_size a)) y
@@ -610,7 +692,8 @@ let distributive t mul add =
     let z = mkSnd (mkSnd w) in
     Id_u(t, mul x (add y z), add (mul x y) (mul x z)))
 
-
+(* TODO: get rid of the number and use the arity of the sigma type
+   instead. *)
 let builtin_dom_cod =
   let open Value in
   let s x = Imm_set_u x in
@@ -627,42 +710,45 @@ let builtin_dom_cod =
   | Sub a
   | Mul a
   | Xor a
-  | Ior a
+  | Or a
   | And a -> 2, Sigma_u(s a, Cst(s a)), Cst(s a)
   | Lsl a
   | Lsr a
   | Asr a -> 2, Sigma_u(s a, Cst(i8_u)), Cst(s a)
   | Sdiv a
-  | Srem a -> 3, Sigma_u(s a, Cst(Sigma_u(s a, Fn(fun y -> positive a y)))), Cst(s a)
-  | Sext (a, b) -> 1, s a, Cst(s b)
+  | Srem a ->
+    3,
+    Sigma_u(s a, Cst(Sigma_u(s a, Fn(fun y -> positive a y)))),
+    Cst(s a)
+  | Cast (a, b) -> 1, s a, Cst(s b)
   (* Axioms about <. *)
-  | LessTrans a ->
+  | Less_trans a ->
     5, Sigma_u(s a, Fn(fun x -> Sigma_u(s a, Fn(fun y ->
       Sigma_u(s a, Fn(fun z -> Sigma_u(less a x y, Cst(less a y z)))))))),
     Fn(fun w -> less a (mkFst w) (mkFst (mkSnd (mkSnd w))))
-  | LessAntisym a -> 1, s a, Fn(fun x -> not_less a x x)
+  | Less_antisym a -> 1, s a, Fn(fun x -> not_less a x x)
   (* Axioms about ==. *)
-  | AeqProp a ->
+  | Aeq_prop a ->
     3, Sigma_u(s a, Fn(fun x -> Sigma_u(s a, Fn(fun y -> aeq a x y)))),
     Fn(fun w -> Id_u(s a, mkFst w, mkFst (mkSnd w)))
-  | AeqRefl a ->
+  | Aeq_refl a ->
     1, s a,
     Fn(fun w -> aeq a w w )
   (* Axioms about addition. *)
-  | AddCommutative a -> commutative (s a) (add a)
-  | AddAssociative a -> associative (s a) (add a)
-  | AddUnit a -> unit (s a) (add a) (Imm(zero_of_size a))
-  | AddInverse a -> 1, s a,
+  | Add_commutative a -> commutative (s a) (add a)
+  | Add_associative a -> associative (s a) (add a)
+  | Add_unit a -> unit (s a) (add a) (Imm(zero_of_size a))
+  | Add_inverse a -> 1, s a,
     (let z = Imm(zero_of_size a) in
      Fn(fun x -> Id_u(s a, add a x (neg a x), z)))
   (* Axioms about multiplication. *)
-  | MulCommutative a -> commutative (s a) (mul a)
-  | MulAssociative a -> associative (s a) (mul a)
-  | MulUnit a -> unit (s a) (mul a) (Imm(one_of_size a))
+  | Mul_commutative a -> commutative (s a) (mul a)
+  | Mul_associative a -> associative (s a) (mul a)
+  | Mul_unit a -> unit (s a) (mul a) (Imm(one_of_size a))
   (* Distribution. *)
   | Distributive a -> distributive (s a) (mul a) (add a)
   (* Definition of subtraction. *)
-  | SubAxiom a -> 2, Sigma_u(s a, Cst(s a)),
+  | Sub_axiom a -> 2, Sigma_u(s a, Cst(s a)),
     Fn(fun w ->
       let x = mkFst w in
       let y = mkSnd w in

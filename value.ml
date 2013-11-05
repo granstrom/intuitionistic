@@ -14,61 +14,11 @@
 (* See the License for the specific language governing permissions and        *)
 (* limitations under the License.                                             *)
 
-type i8 = char
-type i16 = int
-type i32 = int32
-type i64 = int64
-
-type size =
-| I8
-| I16
-| I32
-| I64
-
-type builtin =
-| Aeq of size
-| Less of size
-| Add of size
-| Sub of size
-| Neg of size
-| Mul of size
-| Xor of size
-| Ior of size
-| And of size
-| Not of size
-| Lsl of size
-| Lsr of size
-| Asr of size
-| Sdiv of size
-| Srem of size
-| Sext of size * size
-| LessTrans of size
-| LessAntisym of size
-| AeqProp of size
-| AeqRefl of size
-| AddCommutative of size
-| AddAssociative of size
-| AddUnit of size
-| AddInverse of size
-| MulCommutative of size
-| MulAssociative of size
-| MulUnit of size
-| Distributive of size
-| SubAxiom of size
-
-type imm =
-| Imm8 of i8
-| Imm16 of i16
-| Imm32 of i32
-| Imm64 of i64
-| Enum_cst of Base.enum * Base.enum_lit
-| Refl
+open Base
 
 (* The type of value-level functions from el to 'cod. *)
-and 'cod fn =
-(* Non-constant function. *)
+type 'cod fn =
 | Fn of (el -> 'cod)
-(* Constant function: quite common in dependent type theory. *)
 | Cst of 'cod
 
 (* The type of value-level elements of sets. *)
@@ -84,7 +34,7 @@ and el =
 (* The universe code for the Id set. *)
 | Id_u of el * el * el
 (* The universe code for an enumerated set. *)
-| Enum_u of Base.enum
+| Enum_u of enum
 (* The unverse code for set of immediates. *)
 | Imm_set_u of size
 (* Canonical element of the Pi set. *)
@@ -97,11 +47,14 @@ and el =
 | Invk of el * el fn
 (* Noncanonical value-level element. *)
 | Neut of neut
+(* A 'hole' has the property that destructor(hole) = hole. A hole is
+   equal to anything else. *)
+| Hole
 
 (* The type of value-level neutral elements of sets. *)
 and neut =
 (* Variable. *)
-| Var of Base.var
+| Var of var
 (* Application - destructor of Pi set. *)
 | App of neut * el
 (* First destructor of Sigma set. *)
@@ -109,7 +62,7 @@ and neut =
 (* Second destructor of Sigma set. *)
 | Snd of neut
 (* Destructor of enumerated set. *)
-| Enum_d of neut * set fn * el Base.enum_map
+| Enum_d of neut * set fn * el Lazy.t enum_map
 (* Destructor of Id set. *)
 | Subst of neut * set fn fn * el
 (* Lifting of component. *)
@@ -119,22 +72,22 @@ and neut =
 (* Range of integers. *)
 | Range1 of neut * el
 | Range2 of int32 * neut
-(* TODO: permit enums for local variables.                                    *)
-(* Local mutable variable.                                                    *)
-(* 	fun(b immediate, i interface, a type, n b,                            *)
-(*            p meth { left i, right meth(_ b->b)b } => a)                    *)
-(* 	:i => a                                                               *)
-(* local1(b, i, a, n, p), where p is netural.                                 *)
-| Local1 of size * el * el * el * neut
-(* local2(b, i, a, n, c, t), where p = invk(c, t)                             *)
-| Local2 of size * el * el * el * neut * el fn
-(* local3(b, i, a, n, u, v, t), where p = invk((u, v), t)                     *)
-| Local3 of size * el * el * el * neut * el * el fn
-(* Purify                                                                     *)
+(* local(sz, i, a, init, p), where p is netural. *)
+| Local of size * el * el * el * component
+(* Purify. *)
 | Purify of el * neut
-(* Builtin primitive operation, working on immedaites and reflexivity
-   proofs. *)
+(* catch(B, I, A, f, p), where p is neutral. *)
+| Catch of el * el * el * el * component
+(* Builtin primitive operation. *)
 | Builtin of builtin * imm list * neut * el list
+
+and component =
+(* Neutral object of type meth { C1:I1, ..., Cn:In } => A. *)
+| Component1 of neut
+(* Neutral object of pair type. *)
+| Component2 of neut * el fn
+(* Neutral object of enum type. *)
+| Component3 of neut * el * el fn
 
 (* The type of value-level sets. *)
 and set =
@@ -147,54 +100,58 @@ and set =
 (* The Id set of equality proofs. *)
 | Id of set * el * el
 (* Enumerated sets. *)
-| Enum of Base.enum
+| Enum of enum
 (* Sets of immedate values. *)
 | Imm_set of size
 (* The universe of sets. *)
 | Type
 (* Decoding of a code for a set. *)
 | T of neut
+(* An hole that is a set. *)
+| Hole_set
 
 (* Create an element of the specified variable. *)
-let el_of_var (x : Base.var) : el = Neut (Var x)
+let el_of_var (x : var) : el = Neut (Var x)
+
+(* Crate a new dummy element. *)
+let dummy_el () = el_of_var (Var.dummy ())
+
+(* Create a new element from the given pattern. *)
+let rec el_of_pattern = function
+  | Pvar (_, var) ->
+    assert(var <> Var.no);
+    Neut(Var(var))
+  | Ppair(p, q) -> Pair(el_of_pattern p, el_of_pattern q)
 
 (* Apply the given function to the given value. *)
 let apv (f : 'a fn) (a : el) : 'a =
   match f with
-  | Fn g -> g a
-  | Cst c -> c
+  | Fn(g) -> g a
+  | Cst(c) -> c
 
 (* Apply the given function to the given lazy value. *)
 let ap (f : 'a fn) (a : el lazy_t) : 'a =
   match f with
-  | Fn g -> g (Lazy.force a)
-  | Cst c -> c
+  | Fn(g) -> g (Lazy.force a)
+  | Cst(c) -> c
 
 (* Precompose the function f with the function g. *)
 let precomp (f : 'a -> 'b) (g : 'a fn)  : 'b fn =
   match g with
-  | Cst c -> Cst(f c)
-  | Fn h -> Fn(fun x -> f (h x))
+  | Cst(c) -> Cst(f c)
+  | Fn(h) -> Fn(fun x -> f (h x))
 
-let true_cst = Imm(Enum_cst (Base.bool_enum, Base.bool_true_lit))
-let false_cst = Imm(Enum_cst (Base.bool_enum, Base.bool_false_lit))
-let bool_set = Enum Base.bool_enum
-let bool_u = Enum_u Base.bool_enum
+let true_cst = Imm(true_imm)
+let false_cst = Imm(false_imm)
+let bool_set = Enum bool_enum
+let bool_u = Enum_u bool_enum
 
-let unit_cst = Imm(Enum_cst (Base.unit_enum, Base.unit_lit))
-let unit_set = Enum Base.unit_enum
-let unit_u = Enum_u Base.unit_enum
+let unit_cst = Imm(unit_imm)
+let unit_set = Enum unit_enum
+let unit_u = Enum_u unit_enum
 
-let empty_set = Enum Base.empty_enum
-let empty_u = Enum_u Base.empty_enum
-
-let left_cst = Imm(Enum_cst (Base.plus_enum, Base.left_lit))
-let right_cst = Imm(Enum_cst (Base.plus_enum, Base.right_lit))
-let plus_set = Enum Base.plus_enum
-let plus_u = Enum_u Base.plus_enum
-
-let lambda f = Lambda(Fn f)
-let lambdac f = Lambda(Cst f)
+let empty_set = Enum empty_enum
+let empty_u = Enum_u empty_enum
 
 let i64_set = Imm_set(I64)
 let i32_set = Imm_set(I32)
@@ -210,20 +167,15 @@ let set_of_imm = function
 | Imm16 _ -> i16_set
 | Imm32 _ -> i32_set
 | Imm64 _ -> i64_set
-| Enum_cst (e, _) -> Enum e
-| Refl -> raise Base.Presupposition_error
-
-let newdummy () = Neut(Var (Base.newdummy ()))
+| Enum_imm (e, _) -> Enum e
+| Refl -> raise Presupposition_error
 
 (* Apply x and y to a common dummy variable and pass the results through f. *)
 let fork (f : 'a -> 'b -> 'c) (x : 'a fn) (y : 'b fn) : 'c =
-  let dummy = newdummy () in
+  let dummy = dummy_el () in
   let dx = apv x dummy in
   let dy = apv y dummy in
   f dx dy
-
-(* Raised when an equality check between values fails. *)
-exception Not_equal
 
 (* Raise a Not_equal exception if the two sets are not equal. *)
 let rec eq_set (x : set) (y : set) : unit =
@@ -233,10 +185,12 @@ let rec eq_set (x : set) (y : set) : unit =
   | Tree(i, a), Tree(ii, aa) ->
     eq_el i ii; eq_el a aa
   | Id(a, b, c), Id(aa, bb, cc) -> eq_set a aa; eq_el b bb; eq_el c cc
-  | Enum a, Enum b when Base.enum_equal a b -> ()
+  | Enum a, Enum b when Enum_set.equal a b -> ()
   | Imm_set a, Imm_set b when a = b -> ()
   | Type, Type -> ()
   | T n, T m -> eq_neut n m
+  | Hole_set, _
+  | _, Hole_set -> ()
   | _ -> raise Not_equal
 
 (* Raise a Not_equal exception if the two elements are not equal. *)
@@ -248,14 +202,14 @@ and eq_el (x : el) (y : el) : unit =
   | Tree_u(i, a), Tree_u(ii, aa) ->
     eq_el i ii; eq_el a aa
   | Id_u(a, b, c), Id_u(aa, bb, cc) -> eq_el a aa; eq_el b bb; eq_el c cc
-  | Enum_u a, Enum_u b when Base.enum_equal a b -> ()
+  | Enum_u a, Enum_u b when Enum_set.equal a b -> ()
   | Imm_set_u a, Imm_set_u b when a = b -> ()
   | Lambda(f), Lambda(g) -> fork eq_el f g
   | Lambda(f), Neut(g) ->
-    let dummy = newdummy () in
+    let dummy = dummy_el () in
     eq_el (apv f dummy) (Neut(App(g, dummy)))
   | Neut(g), Lambda(f) ->
-    let dummy = newdummy () in
+    let dummy = dummy_el () in
     eq_el (Neut(App(g, dummy))) (apv f dummy)
   | Pair(a, b), Pair(aa, bb) -> eq_el a aa; eq_el b bb
   | Pair(a, b), Neut(c) -> eq_el a (Neut (Fst c)); eq_el b (Neut (Snd c))
@@ -263,6 +217,8 @@ and eq_el (x : el) (y : el) : unit =
   | Ret(a), Ret(aa) -> eq_el a aa
   | Invk(c, t), Invk(cc, tt) -> eq_el c cc; fork eq_el t tt
   | Neut(n), Neut(m) -> eq_neut n m
+  | Hole, _
+  | _, Hole -> ()
   | _ -> raise Not_equal
 
 (* Raise a Not_equal exception if the two neutral elements are not equal. *)
@@ -282,15 +238,15 @@ and eq_neut (x : neut) (y : neut) : unit =
       eq_neut n nn; fork eq_set _C _CC;
       let mergefn _ u v =
 	match u, v with
-	| Some xx, Some yy -> eq_el xx yy; None
+	| Some xx, Some yy -> eq_el (Lazy.force xx) (Lazy.force yy); None
 	(* The two neuts are not equal because they have different
 	   keys in the destructor function. *)
 	| _ -> raise Not_equal
       in
-      ignore (Base.Enum_map.merge mergefn a aa)
+      ignore (Enum_map.merge mergefn a aa)
     end
   | Subst(r, _C, d), Subst(rr, _CC, dd) ->
-    eq_neut r rr; (Base.comp fork fork) eq_set _C _CC; eq_el d dd
+    eq_neut r rr; (comp fork fork) eq_set _C _CC; eq_el d dd
   | Builtin (p, c, n, r), Builtin (p', c', n', r')
     when p = p' &&
       List.length c = List.length c' &&
@@ -300,24 +256,35 @@ and eq_neut (x : neut) (y : neut) : unit =
       eq_neut n n';
       List.iter2 eq_el r r'
     end
-  | Local1(b, i, a, n, p),  Local1(b', i', a', n', p') when b = b' ->
-    eq_el i i'; eq_el a a'; eq_el n n'; eq_neut p p'
-  | Local2(b, i, a, n, c, t),  Local2(b', i', a', n', c', t') when b = b' ->
-    eq_el i i'; eq_el a a'; eq_el n n'; eq_neut c c'; fork eq_el t t'
-  | Local3(b, i, a, n, u, v, t),  Local3(b', i', a', n', u', v', t') when b = b' ->
-    eq_el i i'; eq_el a a'; eq_el n n'; eq_neut u u'; eq_el v v'; fork eq_el t t'
+  | Local(sz, i, a, n, p),  Local(sz', i', a', n', p') when sz = sz' ->
+    eq_el i i'; eq_el a a'; eq_el n n'; eq_component p p'
   | Purify(c1, m1), Purify(c2, m2) -> eq_el c1 c2; eq_neut m1 m2
+  | Catch(b, i, a, f, p), Catch(b', i', a', f', p') ->
+    eq_el b b'; eq_el i i'; eq_el a a'; eq_el f f'; eq_component p p'
   | _ -> raise Not_equal
 
-and eq_imm (xx:imm) (yy:imm) : unit =
+and eq_imm (xx:imm) (yy:imm) :unit =
   match xx, yy with
   | Imm8 x, Imm8 y when x = y -> ()
   | Imm16 x, Imm16 y when x = y -> ()
   | Imm32 x, Imm32 y when x = y -> ()
   | Imm64 x, Imm64 y when x = y -> ()
-  | Enum_cst(e, Base.Enum_lit x), Enum_cst(f, Base.Enum_lit y)
-    when Base.enum_equal e f && x = y -> ()
+  | Enum_imm(e, Enum_lit x), Enum_imm(f, Enum_lit y)
+    when Enum_set.equal e f && x = y -> ()
   | Refl, Refl -> ()
+  | _ -> raise Not_equal
+
+and eq_component (a:component) (b:component) :unit =
+  match a, b with
+  | Component1(n), Component1(n') ->
+    eq_neut n n'
+  | Component2(n, f), Component2(n', f') ->
+    eq_neut n n';
+    fork eq_el f f'
+  | Component3(n, b, f), Component3(n', b', f') ->
+    eq_neut n n';
+    eq_el b b';
+    fork eq_el f f'
   | _ -> raise Not_equal
 
 let el_ordinal =
@@ -334,6 +301,8 @@ let el_ordinal =
   | Id_u(_, _, _) -> 9
   | Enum_u(_) -> 10
   | Imm_set_u(_) -> 11
+  (* Hole cannot be compared. *)
+  | Hole -> raise Presupposition_error
 
 let neut_ordinal =
   function
@@ -347,11 +316,15 @@ let neut_ordinal =
   | Bind(_, _, _) -> 7
   | Range1(_, _) -> 8
   | Range2(_, _) -> 9
-  | Local1(_, _, _, _, _) -> 10
-  | Local2(_, _, _, _, _, _) -> 11
-  | Local3(_, _, _, _, _, _, _) -> 12
-  | Purify(_, _) -> 13
-  | Builtin(_, _, _, _) -> 14
+  | Local(_, _, _, _, _) -> 10
+  | Purify(_, _) -> 11
+  | Catch(_, _, _, _, _) -> 12
+  | Builtin(_, _, _, _) -> 13
+
+let component_ordinal = function
+  | Component1(_) -> 0
+  | Component2(_, _) -> 1
+  | Component3(_, _, _) -> 2
 
 let rec cmpfold =
   function
@@ -373,14 +346,14 @@ let rec compare_el (x : el) (y : el) : int =
     cmpfold [lazy (compare_el a aa);
              lazy (compare_el b bb);
              lazy (compare_el c cc)]
-  | Enum_u a, Enum_u b -> Base.Enum_set.compare a b
+  | Enum_u a, Enum_u b -> Enum_set.compare a b
   | Imm_set_u a, Imm_set_u b -> compare a b
   | Lambda(f), Lambda(g) -> fork compare_el f g
   | Lambda(f), Neut(g) ->
-    let dummy = newdummy () in
+    let dummy = dummy_el () in
     compare_el (apv f dummy) (Neut(App(g, dummy)))
   | Neut(g), Lambda(f) ->
-    let dummy = newdummy () in
+    let dummy = dummy_el () in
     compare_el (Neut(App(g, dummy))) (apv f dummy)
   | Pair(a, b), Pair(aa, bb) ->
     cmpfold [lazy (compare_el a aa); lazy (compare_el b bb)];
@@ -412,8 +385,9 @@ and compare_neut (x : neut) (y : neut) : int =
   | Fst(n), Fst(nn)
   | Snd(n), Snd(nn) -> compare_neut n nn
   | Enum_d(n, _, a), Enum_d(nn, _, aa) ->
+    let cmplazy x y = compare_el (Lazy.force x) (Lazy.force y) in
     cmpfold [lazy (compare_neut n nn);
-             lazy (Base.Enum_map.compare compare_el a aa)]
+             lazy (Enum_map.compare cmplazy a aa)]
   | Subst(r, _, d), Subst(rr, _, dd) ->
     cmpfold [lazy (compare_neut r rr); lazy (compare_el d dd)]
   | Builtin (p, c, n, r), Builtin (p', c', n', r') ->
@@ -423,24 +397,41 @@ and compare_neut (x : neut) (y : neut) : int =
              lazy (compare_neut n n');
              lazy (compare (List.length r) (List.length r'));
              lazy (cmpfold (List.map2 (fun x y -> lazy (compare_el x y)) r r'))]
-  | Local1(b, _, _, n, p),  Local1(b', _, _, n', p') ->
+  | Local(b, _, _, n, p),  Local(b', _, _, n', p') ->
     cmpfold [lazy (compare b b');
              lazy (compare_el n n');
-             lazy (compare_neut p p')]
-  | Local2(b, _, _, n, c, t),  Local2(b', _, _, n', c', t') when b = b' ->
-    cmpfold [lazy (compare b b');
-             lazy (compare_el n n');
-             lazy (compare_neut c c');
-             lazy (fork compare_el t t')]
-  | Local3(b, _, _, n, u, v, t),  Local3(b', _, _, n', u', v', t') when b = b' ->
-    cmpfold [lazy (compare b b');
-             lazy (compare_el n n');
-             lazy (compare_neut u u');
-             lazy (compare_el v v');
-             lazy (fork compare_el t t')]
+             lazy (compare_component p p')]
+  | Catch(b, _, _, f, p),  Catch(b', _, _, f', p') ->
+    cmpfold [lazy (compare_el b b');
+             lazy (compare_el f f');
+             lazy (compare_component p p')]
   | Purify(_, m), Purify(_, m') -> compare_neut m m'
   | _ ->
     let xx = neut_ordinal x in
     let yy = neut_ordinal y in
     assert(xx <> yy);
     compare xx yy
+
+and compare_component (a:component) (b:component) :int =
+  match a, b with
+  | Component1(n), Component1(n') ->
+    compare_neut n n'
+  | Component2(n, f), Component2(n', f') ->
+    cmpfold [lazy (compare_neut n n');
+             lazy (fork compare_el f f')]
+  | Component3(n, b, f), Component3(n', b', f') ->
+    cmpfold [lazy (compare_neut n n');
+             lazy (compare_el b b');
+             lazy (fork compare_el f f')]
+  | _ ->
+    let xx = component_ordinal a in
+    let yy = component_ordinal b in
+    assert(xx <> yy);
+    compare xx yy
+
+and compare_arrays i n ar1 ar2 =
+  if i = n then 0
+  else
+    let t = compare_el (Array.get ar1 i) (Array.get ar2 i) in
+    if t <> 0 then t
+    else compare_arrays (i + 1) n ar1 ar2

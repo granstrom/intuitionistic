@@ -25,20 +25,20 @@ LLVM_DIS=llvm-dis
 # INCLUDES=-I /my/non-standard/lib
 INCLUDES=
 OCAMLFLAGS=$(INCLUDES) -g
-OCAMLOPTFLAGS=$(INCLUDES)
+OCAMLOPTFLAGS=$(INCLUDES) -p
 
 # ========== MAIN TARGETS
 
-all: test_term test_expr test_llvm iplc iplc.opt ipltop
+all: test_expr test_llvm iplc iplc.opt ipltop
 
 test: all
-	./test_term
 	./test_expr
 	./test_llvm
 	@for x in $$(ls examples/*.ipl); do echo "checking" $$x "done." && ./iplc $$x; done
+	@for x in $$(ls examples/*.ipl); do echo "checking (opt)" $$x "done." && ./iplc.opt $$x; done
 
 clean:
-	rm -f test_term test_expr test_llvm iplc iplc.opt ipltop syntax.mli syntax.ml lex.ml
+	rm -f test_expr test_llvm iplc iplc.opt ipltop syntax.mli syntax.ml lex.ml
 	rm -f *.cm[ioxa]
 	rm -f examples/*.bc
 	rm -f examples/*.s
@@ -48,9 +48,10 @@ clean:
 	rm -f *.s
 	rm -f syntax.output
 	rm -f *~
+	rm -f examples/*~
 	rm -f .depend
 
-# ========== COMMON RULES
+# ========== PATTERN RULES
 
 %.cmo: %.ml
 	$(OCAMLC) $(OCAMLFLAGS) -c $<
@@ -79,9 +80,11 @@ clean:
 %.o: %.s
 	$(CC) -c $<
 
+.PRECIOUS: %.mli %.mly
+
 # ========== LEVEL 1
 
-LEVEL1=base.cmo value.cmo term.cmo eval.cmo printing.cmo reify.cmo ctx.cmo check_term.cmo
+LEVEL1=var.cmo base.cmo value.cmo term.cmo eval.cmo printing.cmo reify.cmo ctx.cmo check_term.cmo initial.cmo
 
 TEST_TERM_OBJS=$(LEVEL1) test_term.cmo
 test_term: $(TEST_TERM_OBJS)
@@ -89,7 +92,7 @@ test_term: $(TEST_TERM_OBJS)
 
 # ========== LEVEL 2
 
-LEVEL2=$(LEVEL1) expr.cmo initial.cmo check_expr.cmo lex.cmo syntax.cmo
+LEVEL2=$(LEVEL1) expr.cmo check_expr.cmo lex.cmo syntax.cmo
 
 lex.ml: syntax.cmi syntax.cmo
 

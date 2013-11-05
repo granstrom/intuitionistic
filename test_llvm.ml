@@ -37,7 +37,9 @@ let parse_string ctx t str =
 let compile name (proto : Ipl_llvm.proto) str =
   let cod, args = proto in
   let codt = Value.Tree(Eval.empty_interface, (Value.Imm_set_u cod)) in
-  let ext ctx (v, t) = Ctx.extend_value ctx v (Value.Imm_set t) in
+  let ext ctx (v, t) =
+    let v' = Var.of_string v in
+    Ctx.extend ctx no_location v' (Value.el_of_var v') (Value.Imm_set t) in
   let ctx = List.fold_left ext Initial.ctx args in
   let ct = parse_string ctx codt str in
   let fn = Ipl_llvm.compile_function name proto ct Ipl_compile.no_invoke in
@@ -45,7 +47,7 @@ let compile name (proto : Ipl_llvm.proto) str =
 
 open Llvm_executionengine
 
-let test name (result:Value.imm) (args:(var * Value.imm) list) str =
+let test name (result:imm) (args:(string * imm) list) str =
   let cod = Ipl_llvm.size_of_imm result in
   let dom = List.map (fun (x, y) -> x, Ipl_llvm.size_of_imm y) args in
   let ct, fn = compile name (cod, dom) str in
@@ -53,7 +55,8 @@ let test name (result:Value.imm) (args:(var * Value.imm) list) str =
   (* Interpret function. *)
   let poly = Reify.el ct in
   let ext ctx (v, t) =
-    Ctx.extend_el_value ctx v (Value.Imm t)
+    let v' = Var.of_string v in
+    Ctx.extend ctx no_location v' (Value.Imm t)
       (Value.Imm_set (Ipl_llvm.size_of_imm t))
   in
   let ctx = List.fold_left ext Initial.ctx args in
@@ -78,11 +81,9 @@ let test name (result:Value.imm) (args:(var * Value.imm) list) str =
   if not (Ipl_llvm.generic_eq_imm r result) then
     failwith (Format.sprintf "Expected %s." (Printing.string_of_imm result))
 
-let i32 x = Value.Imm32 (Int32.of_int x)
-let x = Variable "x"
-let y = Variable "y"
+let i32 x = Imm32 (Int32.of_int x)
 
-let _ = test "test1" (i32 10) [x, i32 5]
+let _ = test "test1" (i32 10) ["x", i32 5]
 "block {
 val fun dup(z i32) tuple(_ i32, _ i32) = z, z;
 val (+) = mod32::(+);
@@ -90,7 +91,7 @@ yield((+)(dup(x)));
 }"
 
 
-let _ = test "test2" (i32 20) [x, i32 10; y, i32 11]
+let _ = test "test2" (i32 20) ["x", i32 10; "y", i32 11]
 "block {
 val (+) = mod32::(+);
 val (<) = mod32::(<);
@@ -100,14 +101,14 @@ val tmp2 = fst(tmp) + snd(tmp);
 yield(tmp2);
 }"
 
-let _ = test "test3" (i32 8) [x, i32 3; y, i32 5]
+let _ = test "test3" (i32 8) ["x", i32 3; "y", i32 5]
 "block {
-for z in x..y {}
+for z in x..y { }
 val (+) = mod32::(+);
 yield(x+y);
 }"
 
-let _ = test "test4" (i32 20) [x, i32 10]
+let _ = test "test4" (i32 20) ["x", i32 10]
 "block {
 val (+) = mod32::(+);
 new c = new_i32(x);
@@ -117,7 +118,7 @@ yield(w);
 
 
 (* Initial value of counter 99. Increase 3 (=x) times 33 gives 198. *)
-let _ = test "test5" (i32 198) [x, i32 3]
+let _ = test "test5" (i32 198) ["x", i32 3]
 "block {
 val (+) = mod32::(+);
 new c = new_i32(99);
@@ -127,7 +128,7 @@ for z in 0..x {
 yield(do c.call(fun(i)i));
 }"
 
-let _ = test "euler3" (i32 233168) [x, i32 1000]
+let _ = test "euler3" (i32 233168) ["x", i32 1000]
 "block {
 val fun (z bool) || (y bool) = z ? true : y;
 val (==) = mod32::(==);

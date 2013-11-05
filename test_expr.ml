@@ -26,38 +26,39 @@ let verify a __A =
   let ____A = Eval.set (Ctx.assign initial_ctx) ___A in
   let _____A = Reify.set ____A in
   Value.eq_set __A ____A;
-  Term.eq_set [] ___A _____A;
   Check_term.poly initial_ctx __A a;
   let aa = Eval.poly (Ctx.assign initial_ctx) a in
   let aaa = Reify.el aa in
   Check_term.poly initial_ctx __A aaa;
   let aaaa = Eval.poly (Ctx.assign initial_ctx) aaa in
-  let aaaaa = Reify.el aaaa in
-  Value.eq_el aa aaaa;
-  Term.eq_poly [] aaa aaaaa
+  Value.eq_el aa aaaa
 
 let parse_string' str =
-  let lexbuf = Lexing.from_string str in
+  let lb = Lexing.from_string str in
+  lb.Lexing.lex_curr_p <- {
+    lb.Lexing.lex_curr_p with Lexing.pos_fname = str
+  };
   try
-    Syntax.expr Lex.token lexbuf
+    Syntax.expr Lex.token lb
   with Parsing.Parse_error ->
-    let curr = lexbuf.Lexing.lex_curr_p in
+    let curr = lb.Lexing.lex_curr_p in
     let line = curr.Lexing.pos_lnum in
     let cnum = curr.Lexing.pos_cnum - curr.Lexing.pos_bol in
-    let tok = Lexing.lexeme lexbuf in
+    let tok = Lexing.lexeme lb in
     Printf.printf "Parse: %s\n" str;
     Printf.printf "%d:%d unexpected token: %s\n" line cnum tok;
     raise Parsing.Parse_error
 
 let with_reporting str f a b =
-  try f a b
-  with
-  | Check_expr.Error as e ->
-    Format.eprintf "\n\n@?%s" str;
-    raise e
-  | e ->
-    Format.print_string str;
-    raise e
+    f a b
+  (* try  *)
+  (* with *)
+  (* | Check_expr.Error as e -> *)
+  (*   Format.eprintf "\n\n@?%s" str; *)
+  (*   raise e *)
+  (* | e -> *)
+  (*   Format.print_string str; *)
+  (*   raise e *)
 
 let parse_string str =
   let a, b =
@@ -144,8 +145,8 @@ val fun euler2(x i32) = block meth {} => i32 {
 )"
 
 let _ = parse_string "(
-val fun (||)(z bool, y bool) bool = z ? true : y;
 val (==) = mod32::(==);
+val fun (||)(z bool, y bool) bool = z ? true : y;
 val (+) = mod32::(+);
 val srem = mod32::srem;
 val fun euler2(x i32) = block meth {} => i32 {

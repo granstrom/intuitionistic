@@ -13,4 +13,4 @@ Type 'make' in the IPL main folder.
 The default IPL Makefile target creates the following binaries.
 ./iplc      The iplc compiler.
 ./iplc.opt  An optimized version of the iplc compiler.
-./iplctop   An Ocaml toplevel with iplc preloaded.
+./ipltop    An Ocaml toplevel with IPL preloaded.

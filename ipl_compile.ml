@@ -23,27 +23,35 @@
 
 type el = Value.el
 type neut = Value.neut
+type component = Value.component
 type label = Label of int
 type target = Target of int
 type alloca = Alloca of int
+type size = Base.size
+type builtin = Base.builtin
+type var = Base.var
+type imm = Base.imm
+type 'a enum_map = 'a Base.enum_map
+
+exception Compile_hole
 
 (* An object of this type represents a piece of code that can be
    compiled to an LLVM value. *)
 type value =
 (* The first value evaluates to an enum literal. *)
-| Select of value * value Base.enum_map
+| Select of value * value enum_map
 (* Gives as result whatever the block returns through End_purify. *)
 | Purify of target * block
-| Op of Value.builtin * value list
-| Var of Base.var
-| Imm of Value.imm
+| Op of builtin * value list
+| Var of var
+| Imm of imm
 
 (* An object of this type represents a piece of code that can be
    translated to a terminated block of LLVM code. *)
 and block' =
 (* The first value evaluates to an enum literal: continue with the
    specified block. *)
-| Switch of value * block Base.enum_map
+| Switch of value * block enum_map
 (* Final return from function. *)
 | Ret of value
 (* Similar to Ret, but instead of returning, branch to target. *)
@@ -51,12 +59,12 @@ and block' =
 (* Used to implement range loops. *)
 | Goto of label
 (* Range(from, to, x, loop_label, body, then) *)
-| Range of value * value * Base.var * label * block * block
+| Range of value * value * var * label * block * block
 (* Create a variable in the entry block of the function. *)
-| Declare_alloca of alloca * Value.size * value * block
+| Declare_alloca of alloca * size * value * block
 (* Load the value of alloca into var, execute first code, update store
    with value, and execute second code with var bound to new value. *)
-| Load_and_store of alloca * Base.var * value * Base.var * block
+| Load_and_store of alloca * var * value * var * block
 (* This construct is only used for memoization. *)
 | Block_ref of label
 
@@ -82,7 +90,7 @@ let rec format_value (fmt:Format.formatter) :value -> unit =
     fprintf fmt "(%a" Printing.builtin op;
     List.iter (fun x -> fprintf fmt " %a" format_value x) args;
     fprintf fmt ")"
-  | Var(Base.Variable x) -> fprintf fmt "%s" x
+  | Var(x) -> fprintf fmt "%a" Var.format x
   | Imm(i) -> fprintf fmt "%s" (Printing.string_of_imm i)
 and format_block (fmt:Format.formatter) (bbb:block) :unit =
   let open Format in
@@ -102,13 +110,13 @@ and format_block (fmt:Format.formatter) (bbb:block) :unit =
   | Declare_alloca(Alloca a, sz, v, c) ->
     fprintf fmt "@[<hov 2>[alloca [cell_%d:%s = %a]@ %a]@]"
       a (Printing.string_of_size sz) format_value v format_block c
-  | Load_and_store(Alloca a, Base.Variable x, st, Base.Variable y, gt) ->
-    fprintf fmt "@[<hov 1>[%s = [%s = cell_%d; %a]@ %a]@]"
-      y x a format_value st format_block gt
-  | Range(a, b, Base.Variable x, Label l, bdy, next) ->
+  | Load_and_store(Alloca a, x, st, y, gt) ->
+    fprintf fmt "@[<hov 1>[%a = [%a = cell_%d; %a]@ %a]@]"
+      Var.format y Var.format x a format_value st format_block gt
+  | Range(a, b, x, Label l, bdy, next) ->
     fprintf fmt
-      "@[<hov 2>[range [@[<hv 0>%s in %a .. %a@ next: label_%d@ finally: %a@]]@ %a]@]"
-      x format_value a format_value b l format_block next format_block bdy
+      "@[<hov 2>[range [@[<hv 0>%a in %a .. %a@ next: label_%d@ finally: %a@]]@ %a]@]"
+      Var.format x format_value a format_value b l format_block next format_block bdy
   | Block_ref(Label l) -> fprintf fmt "[goto %d@@]" l
 
 (* How to compile Value.Ret. *)
@@ -134,9 +142,6 @@ let no_pair (_:el) (_:el):'a = raise Base.Presupposition_error
 let label_counter = ref 0
 let target_counter = ref 0
 let alloca_counter = ref 0
-let range_counter = ref 0
-let local_counter = ref 0
-let tmp_counter = ref 0
 let next_label () =
   let x = !label_counter in
   label_counter:= x + 1;
@@ -149,25 +154,10 @@ let next_alloca () =
   let x = !alloca_counter in
   alloca_counter:= x + 1;
   Alloca x
-let next_range_var () =
-  let x = !range_counter in
-  range_counter:= x + 1;
-  Base.Variable(Format.sprintf "#r%d" x)
-let next_local_var () =
-  let x = !local_counter in
-  local_counter:= x + 1;
-  Base.Variable(Format.sprintf "#l%d" x)
-let next_tmp_var () =
-  let x = !tmp_counter in
-  tmp_counter:= x + 1;
-  Base.Variable(Format.sprintf "#t%d" x)
 let reset_counters () =
   label_counter := 0;
   target_counter := 0;
   alloca_counter := 0;
-  range_counter := 0;
-  local_counter := 0;
-  tmp_counter := 0
 
 (* Objects of type Value.el are comparable, and can be the key of a map. *)
 module El_map = Map.Make(struct
@@ -208,6 +198,9 @@ let memo (yield:yield):yield =
 
 (* Here starts the main compilation algorithm of IPL. *)
 
+(* TODO: Make a special case of neut_value with no lambda and no
+   pair. This functioncan be memoized. *)
+
 (* How to translate a Value.neut into a value. *)
 let rec neut_lp_value (lambda:value lambda) (pair:value pair) :neut->value =
   function
@@ -219,7 +212,7 @@ let rec neut_lp_value (lambda:value lambda) (pair:value pair) :neut->value =
     Op(op, pre' @ n' :: post')
   | Value.Enum_d(n, _, cs) ->
     Select(neut_lp_value no_lambda no_pair n,
-           Base.Enum_map.map (el_lp_value lambda pair) cs)
+           Base.Enum_map.map (fun x -> el_lp_value lambda pair (Lazy.force x)) cs)
   | Value.App(f, a) ->
     let lambda' ff = el_lp_value lambda pair (Value.apv ff a) in
     neut_lp_value lambda' no_pair f
@@ -246,6 +239,7 @@ and el_lp_value (lambda:value lambda) (pair:value pair) :el->value =
   | Value.Neut(n) -> neut_lp_value lambda pair n
   | Value.Lambda(f) -> lambda f
   | Value.Pair(a, b) -> pair a b
+  | Value.Hole -> raise Compile_hole
   (* All other constructors of Value.el create objets of procedure
      type, or objects of type Type. Hence they cannot end up here. *)
   | _ -> raise Base.Presupposition_error
@@ -260,7 +254,7 @@ and neut_iy_block (invoke:invoke) (yield:yield) :neut->block =
       (el_lp_value no_lambda no_pair b)
   | Value.Range2(a, b) ->
     range invoke yield
-      (Imm (Value.Imm32 a))
+      (Imm (Base.Imm32 a))
       (neut_lp_value no_lambda no_pair b)
   | Value.Bind(c, _, t) ->
     let yield' a = el_iy_block invoke yield (Value.apv t a) in
@@ -268,17 +262,15 @@ and neut_iy_block (invoke:invoke) (yield:yield) :neut->block =
   | Value.For(n, _, _, t) ->
     let invoke' d s = el_iy_block invoke s (Value.apv t d) in
     neut_iy_block invoke' yield n
-  | Value.Local1(im, _, _, init, n) ->
-    local invoke yield im init (Value.Neut n)
-  | Value.Local2(im, _, _, init, c, t) ->
-    local invoke yield im init (Value.Invk(Value.Neut c, t))
-  | Value.Local3(im, _, _, init, a, b, t) ->
-    local invoke yield im init (Value.Invk(Value.Pair(Value.Neut a, b), t))
+  | Value.Local(im, _, _, init, p) ->
+    local invoke yield im init p
+  | Value.Catch(_, _, _, f, p) ->
+    catch invoke yield f p
   (* Note that n is of enum type. *)
   | Value.Enum_d(n, _, cs) ->
     ref None,
     Switch(neut_lp_value no_lambda no_pair n,
-           Base.Enum_map.map (el_iy_block invoke yield) cs)
+           Base.Enum_map.map (fun x -> el_iy_block invoke yield (Lazy.force x)) cs)
   | Value.App(f, a) ->
     let lambda' ff = el_iy_block invoke yield (Value.apv ff a) in
     neut_lp_block lambda' no_pair f
@@ -303,6 +295,7 @@ and el_iy_block (invoke:invoke) (yield:yield) :el->block =
     let cont x = el_iy_block invoke yield (Value.apv t x) in
     invoke c (memo cont)
   | Value.Neut(n) -> neut_iy_block invoke yield n
+  | Value.Hole -> raise Compile_hole
   | _ -> raise Base.Presupposition_error
 
 (* How to translate a Value.neut of procedure type into a block, when
@@ -312,7 +305,7 @@ and neut_lp_block (lambda:block lambda) (pair:block pair) :neut->block =
   | Value.Enum_d(n, _, cs) ->
     ref None,
     Switch(neut_lp_value no_lambda no_pair n,
-           Base.Enum_map.map (el_lp_block lambda pair) cs)
+           Base.Enum_map.map (fun x -> el_lp_block lambda pair (Lazy.force x)) cs)
   | Value.App(f, a) ->
     let lambda' ff = el_lp_block lambda pair (Value.apv ff a) in
     neut_lp_block lambda' no_pair f
@@ -336,10 +329,53 @@ and el_lp_block (lambda:block lambda) (pair:block pair) :el->block =
   | Value.Neut(n) -> neut_lp_block lambda pair n
   | Value.Lambda(f) -> lambda f
   | Value.Pair(a, b) -> pair a b
+  | Value.Hole -> raise Compile_hole
   | _ -> raise Base.Presupposition_error
 
-(* This function is used to translate Value.LocalX into a block. *)
-and local (invoke:invoke) (yield:yield) (sz:Value.size) (init:el) (n:el):block =
+(* This function is use to translate Value.Catch into a block. *)
+and catch (invoke:invoke) (yield:yield) (f:el) (n:component):block =
+  let open Value in
+  let catcher' (y:el):block =
+    (* f is a function b -> i => a, y is of type b. *)
+    el_iy_block invoke yield (Eval.mkApp f y)
+  in
+  let catcher = memo catcher' in
+  (* This is how an invocation will be compiled inside n. *)
+  let invoke' (p:el) (t:el->block):block =
+    (* p is of sigma type: x is the enum value and y the method argument. *)
+    let pair (x:el) (y:el):block =
+      let emit_base () = invoke y t in
+      let emit_catch () = catcher y in
+      (* The enum value x may need to be computed. *)
+      match x with
+      | Imm(Base.Enum_imm(e, l)) when Base.Enum_set.equal e Base.bool_enum ->
+        begin
+          match l with
+          | w when w = Base.false_lit -> emit_base ()
+          | w when w = Base.true_lit -> emit_catch ()
+	  | _ -> raise Base.Presupposition_error
+	end
+      | Neut z ->
+        let zz = neut_lp_value no_lambda no_pair z in
+        let cases = Base.Enum_map.add Base.false_lit (emit_base ()) (
+          Base.Enum_map.add Base.true_lit (emit_catch ()) Base.Enum_map.empty)
+        in
+        ref None, Switch(zz, cases)
+      | _ -> raise Base.Presupposition_error
+    in
+    (* invoke p t inside n will be translated as follows. *)
+    el_lp_block no_lambda pair p
+  in
+  let el_of_component = function
+    | Component1 n -> Neut n
+    | Component2(a, b) -> Invk(Neut a, b)
+    | Component3(a, b, c) -> Invk(Pair(Neut a, b), c)
+  in
+  el_iy_block invoke' yield (el_of_component n)
+
+(* This function is used to translate Value.Local into a block. *)
+and local (invoke:invoke) (yield:yield) (sz:size) (ini:el) (n:component):block =
+  let open Value in
   let alloca = next_alloca () in
   (* This is how an invocation will be compiled inside n. *)
   let invoke' (p:el) (t:el->block):block =
@@ -348,41 +384,46 @@ and local (invoke:invoke) (yield:yield) (sz:Value.size) (init:el) (n:el):block =
       let emit_base () = invoke y t in
       let emit_getset () =
         (* y is a function local->local. *)
-        let get_var = next_local_var () in
-        let get_value = Value.Neut(Value.Var(get_var)) in
+        let get_var = Var.dummy () in
+        let get_value = Neut(Var(get_var)) in
         let new_value = el_lp_value no_lambda no_pair (Eval.mkApp y get_value) in
-        let set_var = next_local_var () in
-        let set_value = Value.Neut(Value.Var(set_var)) in
+        let set_var = Var.dummy () in
+        let set_value = Neut(Var(set_var)) in
         let cont_block = t set_value in
         ref None, Load_and_store(alloca, get_var, new_value, set_var, cont_block)
       in
       (* The enum value x may need to be computed. *)
       match x with
-      | Value.Imm(Value.Enum_cst(e, l)) when Base.enum_equal e Base.plus_enum ->
+      | Imm(Base.Enum_imm(e, l)) when Base.Enum_set.equal e Base.bool_enum ->
         begin
           match l with
-          | w when w = Base.left_lit -> emit_base ()
-          | w when w = Base.right_lit -> emit_getset ()
+          | w when w = Base.false_lit -> emit_base ()
+          | w when w = Base.true_lit -> emit_getset ()
 	  | _ -> raise Base.Presupposition_error
 	end
-      | Value.Neut z ->
+      | Neut z ->
         let zz = neut_lp_value no_lambda no_pair z in
-        let cases = Base.Enum_map.add Base.left_lit (emit_base ()) (
-          Base.Enum_map.add Base.right_lit (emit_getset ()) Base.Enum_map.empty)
+        let cases = Base.Enum_map.add Base.false_lit (emit_base ()) (
+          Base.Enum_map.add Base.true_lit (emit_getset ()) Base.Enum_map.empty)
         in
         ref None, Switch(zz, cases)
       | _ -> raise Base.Presupposition_error
     in
-    (* invoke p t inside n will be trasnated as follows. *)
+    (* invoke p t inside n will be translated as follows. *)
     el_lp_block no_lambda pair p
   in
   (* The initial value is of base type (in fact, enum type). *)
-  let init' = el_lp_value no_lambda no_pair init in
-  let body = el_iy_block invoke' yield n in
-  ref None, Declare_alloca(alloca, sz, init', body)
+  let ini' = el_lp_value no_lambda no_pair ini in
+  let el_of_component = function
+    | Component1 n -> Neut n
+    | Component2(a, b) -> Invk(Neut a, b)
+    | Component3(a, b, c) -> Invk(Pair(Neut a, b), c)
+  in
+  let body = el_iy_block invoke' yield (el_of_component n) in
+  ref None, Declare_alloca(alloca, sz, ini', body)
 
 and range (invoke:invoke) (yield:yield) (a:value) (b:value) :block =
-  let x = next_range_var () in
+  let x = Var.dummy () in
   let xx = Value.Neut(Value.Var x) in
   let lbl = next_label () in
   (* No need to memoize this yield function, as it is trivial. *)

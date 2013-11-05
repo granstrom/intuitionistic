@@ -16,6 +16,7 @@
 (* See the License for the specific language governing permissions and        *)
 (* limitations under the License.                                             *)
 
+open Base
 open Syntax
 open Lexing
 
@@ -41,16 +42,16 @@ let format_details (fmt:Format.formatter) (err:details) :unit =
   | Invalid_hex ->
     Format.fprintf fmt "hex literal must be of size 2, 4, 8, or 16"
 
-exception Error of (string * Base.pos) * details
+exception Error of (string * pos) * details
 
 let format_error (fmt:Format.formatter)
     ((fname, (a, b)), (err)):unit =
   Format.fprintf fmt "%s:%d.%d: %a" fname a b format_details err
 
-let pos_of_lexpos (p:Lexing.position) :Base.pos =
+let pos_of_lexpos (p:Lexing.position) :pos =
   (p.Lexing.pos_lnum, p.Lexing.pos_cnum - p.Lexing.pos_bol)
 
-let currpos (lexbuf:Lexing.lexbuf):string*Base.pos =
+let currpos (lexbuf:Lexing.lexbuf):string*pos =
   lexbuf.lex_curr_p.pos_fname, (pos_of_lexpos (lexbuf.lex_curr_p))
 
 let keyword_table =
@@ -99,7 +100,7 @@ let int_of_hex c =
   | x when '0' <= x && x <= '9' -> (Char.code x) - (Char.code '0')
   | x when 'a' <= x && x <= 'h' -> (Char.code x) - (Char.code 'a') + 10
   | x when 'A' <= x && x <= 'H' -> (Char.code x) - (Char.code 'A') + 10
-  | _ -> raise Base.Presupposition_error
+  | _ -> raise Presupposition_error
 
 let int64_of_hex_string str =
   let open Int64 in
@@ -111,13 +112,13 @@ let int64_of_hex_string str =
 
 let i64_of_string pos str =
   try
-    Value.Imm64(Int64.of_string str)
+    Imm64(Int64.of_string str)
   with
   | Failure _ -> raise (Error(pos, Literal_overflow "i64"))
 
 let i32_of_string pos str =
   try
-    Value.Imm32(Int32.of_string str)
+    Imm32(Int32.of_string str)
   with
   | Failure _ -> raise (Error(pos, Literal_overflow "i32"))
 
@@ -125,7 +126,7 @@ let i16_of_string pos str =
   try
     let i = int_of_string str in
     if i > 32767 || i < -32768 then raise (Failure "")
-    else Value.Imm16(i)
+    else Imm16(i)
   with
   | Failure _ -> raise (Error(pos, Literal_overflow "i16"))
 
@@ -133,7 +134,7 @@ let i8_of_string pos str =
   try
     let i = int_of_string str in
     if i > 127 || i < -128 then raise (Failure "")
-    else Value.Imm8(Char.chr i)
+    else Imm8(Char.chr i)
   with
   | Failure _ -> raise (Error(pos, Literal_overflow "i16"))
 
@@ -184,10 +185,10 @@ rule token = parse
 	let p = int64_of_hex_string d in
 	IMM (
 	  match String.length d with
-	  | 2 -> Value.Imm8 (Char.chr (Int64.to_int p))
-	  | 4 -> Value.Imm16 (Int64.to_int p)
-	  | 8 -> Value.Imm32 (Int64.to_int32 p)
-	  | 16 -> Value.Imm64 p
+	  | 2 -> Imm8 (Char.chr (Int64.to_int p))
+	  | 4 -> Imm16 (Int64.to_int p)
+	  | 8 -> Imm32 (Int64.to_int32 p)
+	  | 16 -> Imm64 p
           | _ -> raise (Error(currpos lexbuf, Invalid_hex))
 	)
       }

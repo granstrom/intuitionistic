@@ -15,8 +15,8 @@ val I_toggle = meth {
 
 // This interface is used internally in IPL to implement the 'new' construct.
 val fun (I interface) ++ (J interface) interface = meth {
-  left: I,
-  right: J
+  false: I,
+  true: J
 };
 
 // This is the interface introduced by new_i32.
@@ -67,10 +67,10 @@ val fun toggle_helper(
   I interface, A type, prog I ++ I_toggle => A) I ++ prop32 => A =
 interpret prog {
   fun {
-    left@x: call(left@x),
-    right@: fun {
-      value@_: block { val x = get right; yield(x == 1); },
-      activate@_: block { right := 1 - right; }
+    false@x: call(false@x),
+    true@: fun {
+      value@_: block { val x = get true; yield(x == 1); },
+      activate@_: block { val _ = do true.call(fun(x) 1 - x); }
     }
   }
 };

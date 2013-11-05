@@ -14,48 +14,49 @@
 (* See the License for the specific language governing permissions and        *)
 (* limitations under the License.                                             *)
 
-(*
- TODO: record the (original) binding position of the variables to
- improve error messages, e.g., for Rebound_error.
-*)
-type ctx_types = (Base.var * Value.set Lazy.t) list
+open Base
 
+type types = (bool ref * location * Value.set) var_map
+
+(* The two maps and the set *must* have the same set of keys. *)
 type ctx =
-  | Ctx of ctx_types * Eval.assign
+  | Internal_ctx_ctor of types * Eval.assign
 
 (* The variable is already bound in the context when trying to bind it. *)
-exception Rebound_error of ctx * Base.var
+exception Rebound_error of location * location * var
 
-let empty = Ctx([], Eval.Nil)
+let empty = Internal_ctx_ctor(Var_map.empty, Var_map.empty)
 
-let assign : ctx -> Eval.assign = function Ctx (_, e) -> e
+let assign : ctx -> Eval.assign = function Internal_ctx_ctor (_, e) -> e
 
-let extend_el (ctx : ctx) (x : Base.var) (a : Value.el) (_A : Value.set Lazy.t) : ctx =
-  assert (x <> Base.Variable "");
-  match ctx with
-  | Ctx(vs, es) ->
+let find_type x = function
+  | Internal_ctx_ctor (ts, _) ->
+    let r, _, t = Var_map.find x ts in
+    r := true;
+    t
+
+let extend (ctx:ctx) (loc:location) (x:var) (a:Value.el) (_A:Value.set) :ctx =
+  if x = Var.no then ctx
+  else match ctx with
+  | Internal_ctx_ctor(ts, es) ->
     begin
-      match Base.try_find (fun (y, _) -> x = y) vs with
-      | Some (_, _) -> raise (Rebound_error(ctx, x))
-      | None -> ()
-    end;
-    Ctx((x, _A) :: vs, Eval.Assign(es, x, a))
+      try
+        let _, bloc, _ = Var_map.find x ts in
+        raise (Rebound_error(bloc, loc, x))
+      with Not_found ->
+        Internal_ctx_ctor(Var_map.add x (ref false, loc, _A) ts,
+                          Var_map.add x a es)
+    end
 
-let extend (ctx : ctx) (x : Base.var) (_A : Value.set Lazy.t) : ctx =
-  extend_el ctx x (Value.el_of_var x) _A
-
-let extend_term (ctx : ctx) (x : Base.var) (_A : Term.set) : ctx =
-  extend ctx x (lazy (Eval.set (assign ctx) _A))
-
-let extend_value (ctx : ctx) (x : Base.var) (_A : Value.set) : ctx =
-  extend ctx x (lazy _A)
-
-let extend_el_value (ctx : ctx) (x : Base.var) (a : Value.el) (_A : Value.set) : ctx =
-  extend_el ctx x a (lazy _A)
-
-let lookup x =
-  assert (x <> Base.Variable "");
-  function Ctx(vs, _) ->
-    match Base.try_find (fun (y, _) -> x = y) vs with
-    | Some (_, _A) -> Lazy.force _A
-    | None -> raise Not_found
+let rec extend_with_pattern (ctx:ctx) :pattern -> Value.set -> Value.el * ctx =
+  function
+  | Pvar(loc, x) ->
+    let a = Value.el_of_var x in
+    fun _A -> a, extend ctx loc x a _A
+  | Ppair(p, q) ->
+    function
+    | Value.Sigma(_P, _Q) ->
+      let x, ctx' = extend_with_pattern ctx p _P in
+      let y, ctx'' = extend_with_pattern ctx' q (Value.apv _Q x) in
+      Value.Pair(x, y), ctx''
+    | _ -> raise Presupposition_error

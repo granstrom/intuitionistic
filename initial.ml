@@ -24,10 +24,11 @@ let rec mkctx =
   function
   | [] -> Ctx.empty
   | (x, a, _A) :: cs ->
+    (* Format.printf "adding %s\n" x; *)
     let ctx = mkctx cs in
     verify_type ctx _A;
     verify ctx a _A;
-    Ctx.extend_el_value ctx (Variable x) a _A
+    Ctx.extend ctx no_location (Var.of_string x) a _A
 
 let mkstruct lst =
   let open Value in
@@ -36,11 +37,13 @@ let mkstruct lst =
   let values = enum_map_make (List.map (fun (x, y, _) -> lit x, y) lst) in
   let cod = Fn(fun x -> Eval.univ (Eval.mkEnum_d x (Cst Type) types)) in
   let enum = Enum (enum_of_enum_map values) in
-  lambda(fun x -> Eval.mkEnum_d x cod values), Pi(enum, cod)
+  Eval.lambda(fun x -> Eval.mkEnum_d x cod values), Pi(enum, cod)
 
 let builtin_struct lst =
   mkstruct (
-    List.map (fun (x, y) -> let v, t = Eval.builtin_val_type y in x, v, t) lst)
+    List.map (fun (x, y) ->
+      let v, t = Eval.builtin_val_type y in x, lazy v, lazy t)
+      lst)
 
 let mod_i name x =
   let open Value in
@@ -53,7 +56,7 @@ let mod_i name x =
       "srem"  , Srem x;
       "sdiv"  , Sdiv x;
       "xor"   , Xor x;
-      "ior"   , Ior x;
+      "ior"   , Or x;
       "and"   , And x;
       "not"   , Not x;
 
@@ -64,29 +67,29 @@ let mod_i name x =
       "(<)"   , Less x;
       "(==)"  , Aeq x;
 
-      "to_i8" , Sext (x, I8);
-      "to_i16" , Sext (x, I16);
-      "to_i32" , Sext (x, I32);
-      "to_i64" , Sext (x, I64);
+      "to_i8" , Cast (x, I8);
+      "to_i16" , Cast (x, I16);
+      "to_i32" , Cast (x, I32);
+      "to_i64" , Cast (x, I64);
 
-      "less_trans", LessTrans x;
-      "less_antisym", LessAntisym x;
-      "eq_prop", AeqProp x;
-      "eq_refl", AeqRefl x;
-      "add_comm", AddCommutative x;
-      "add_assoc", AddAssociative x;
-      "add_unit", AddUnit x;
-      "add_inv", AddInverse x;
-      "mul_comm", MulCommutative x;
-      "mul_assoc", MulAssociative x;
-      "mul_unit", MulUnit x;
+      "less_trans", Less_trans x;
+      "less_antisym", Less_antisym x;
+      "eq_prop", Aeq_prop x;
+      "eq_refl", Aeq_refl x;
+      "add_comm", Add_commutative x;
+      "add_assoc", Add_associative x;
+      "add_unit", Add_unit x;
+      "add_inv", Add_inverse x;
+      "mul_comm", Mul_commutative x;
+      "mul_assoc", Mul_associative x;
+      "mul_unit", Mul_unit x;
       "dist", Distributive x;
-      "sub_axiom", SubAxiom x;
+      "sub_axiom", Sub_axiom x;
     ] in
   name, a, _A
 
 let tree p = Value.Tree_u(Eval.mkFst p, Eval.mkSnd p)
-let split f = Value.lambda(fun x -> f (Eval.mkFst x) (Eval.mkSnd x))
+let split f = Eval.lambda(fun x -> f (Eval.mkFst x) (Eval.mkSnd x))
 let res = split (fun y z -> Eval.mkApp (Eval.mkSnd y) z)
 let res_type =
   let open Value in
@@ -112,16 +115,17 @@ let ctx =
     "i32"   , i32_u              , Type;
     "i16"   , i16_u              , Type;
     "i8"    , i8_u               , Type;
-    "cmd"   , lambda(Eval.mkFst) , Pi(Eval.interface, (Cst Type));
+    "cmd"   , Eval.lambda(Eval.mkFst) , Pi(Eval.interface, (Cst Type));
     "res"   , res                , res_type;
     "call2" , call               , call_type;
-    "(=>)"  , lambda(tree)       , Pi(Sigma(Eval.interface, Cst Type), (Cst Type));
-    mod_i "mod8" Value.I8;
-    mod_i "mod16" Value.I16;
-    mod_i "mod32" Value.I32;
-    mod_i "mod64" Value.I64;
-    mk_ref "new_i8" Value.I8;
-    mk_ref "new_i16" Value.I16;
-    mk_ref "new_i32" Value.I32;
-    mk_ref "new_i64" Value.I64;
+    "(=>)"  , Eval.lambda(tree)  , Pi(Sigma(Eval.interface, Cst Type), (Cst Type));
+    "catch" , Eval.catch_val     , Eval.catch_type;
+    mod_i "mod8" I8;
+    mod_i "mod16" I16;
+    mod_i "mod32" I32;
+    mod_i "mod64" I64;
+    mk_ref "new_i8" I8;
+    mk_ref "new_i16" I16;
+    mk_ref "new_i32" I32;
+    mk_ref "new_i64" I64;
 ]

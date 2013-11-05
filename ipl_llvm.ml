@@ -25,7 +25,7 @@ type llvalue = Llvm.llvalue
 type lltype = Llvm.lltype
 type llbasicblock = Llvm.llbasicblock
 type llmodule = Llvm.llmodule
-type imm = Value.imm
+type imm = Base.imm
 type el = Value.el
 type neut = Value.neut
 type value = Ipl_compile.value
@@ -33,7 +33,6 @@ type block = Ipl_compile.block
 type label = Ipl_compile.label
 type target = Ipl_compile.target
 type alloca = Ipl_compile.alloca
-type size = Value.size
 let dump_value = Llvm.dump_value
 let dump_module = Llvm.dump_module
 
@@ -68,10 +67,10 @@ let new_block name =
 
 let lltype_of_size:size -> lltype =
   function
-  | Value.I8 -> i8
-  | Value.I16 -> i16
-  | Value.I32 -> i32
-  | Value.I64 -> i64
+  | I8 -> i8
+  | I16 -> i16
+  | I32 -> i32
+  | I64 -> i64
 
 (* Find the ordinal number of enum constant c inside enum cs. *)
 let enum_ordinal cs c =
@@ -83,8 +82,8 @@ let enum_ordinal cs c =
 let mk_enum_const cs c = const_int i32 (enum_ordinal cs c)
 
 (* We actually rely on the fact that false < true. *)
-let _ = assert(enum_ordinal bool_enum bool_true_lit = 1)
-let _ = assert(enum_ordinal bool_enum bool_false_lit = 0)
+let _ = assert(enum_ordinal bool_enum true_lit = 1)
+let _ = assert(enum_ordinal bool_enum false_lit = 0)
 
 let llvalue_of_imm : imm -> llvalue =
   let open Value in
@@ -93,61 +92,61 @@ let llvalue_of_imm : imm -> llvalue =
   | Imm16 x -> const_int i16 x
   | Imm32 x -> const_of_int64 i32 (Int64.of_int32 x) true
   | Imm64 x -> const_of_int64 i64 x true
-  | Enum_cst(cs, c) -> mk_enum_const cs c
+  | Enum_imm(cs, c) -> mk_enum_const cs c
   (* Due to eager evaluation, refl objects will need to be compiled
      (e.g., for sdiv), but they will not make it into the code. *)
   | Refl -> Llvm.undef i8
 
 let lltype_of_imm:imm -> lltype =
   function
-  | Value.Imm8 _ -> i8
-  | Value.Imm16 _ -> i16
-  | Value.Imm32 _ -> i32
-  | Value.Imm64 _ -> i64
-  | Value.Enum_cst(_, _) -> i32
-  | Value.Refl -> i8
+  | Imm8 _ -> i8
+  | Imm16 _ -> i16
+  | Imm32 _ -> i32
+  | Imm64 _ -> i64
+  | Enum_imm(_, _) -> i32
+  | Refl -> i8
 
 (* Create a shift argument of type a with value y. Only the lowest
    bits of y are taken in to account, depending on the size of a. *)
 let mk_shift a y =
   let ty = lltype_of_size a in
   let yy = match a with
-    | Value.I8 -> y
+    | I8 -> y
     | _ -> build_zext ty y
   in
   let tysz = match a with
-    | Value.I8 -> 0x07
-    | Value.I16 -> 0x0f
-    | Value.I32 -> 0x1f
-    | Value.I64 -> 0x3f
+    | I8 -> 0x07
+    | I16 -> 0x0f
+    | I32 -> 0x1f
+    | I64 -> 0x3f
   in
   Llvm.build_and yy (const_int ty tysz) "shiftprep" builder
 
 let builtin op vals =
   match op, vals with
-  | Value.Add(_), [x; y] -> Llvm.build_add x y "" builder
-  | Value.Sub(_), [x; y] -> Llvm.build_sub x y "" builder
-  | Value.Neg(_), [x]    -> Llvm.build_neg x "" builder
-  | Value.Mul(_), [x; y] -> Llvm.build_mul x y "" builder
-  | Value.Srem(_), [x; y; _] -> Llvm.build_srem x y "" builder
-  | Value.Sdiv(_), [x; y; _] -> Llvm.build_sdiv x y "" builder
-  | Value.Xor _, [x; y] -> Llvm.build_xor x y "" builder
-  | Value.Ior _, [x; y] -> Llvm.build_or  x y "" builder
-  | Value.And _, [x; y] -> Llvm.build_and x y "" builder
-  | Value.Not _, [x]    -> Llvm.build_not x "" builder
-  | Value.Lsl a, [x; y] -> Llvm.build_shl  x (mk_shift a y) "" builder
-  | Value.Lsr a, [x; y] -> Llvm.build_lshr x (mk_shift a y) "" builder
-  | Value.Asr a, [x; y] -> Llvm.build_ashr x (mk_shift a y) "" builder
+  | Add(_), [x; y] -> Llvm.build_add x y "" builder
+  | Sub(_), [x; y] -> Llvm.build_sub x y "" builder
+  | Neg(_), [x]    -> Llvm.build_neg x "" builder
+  | Mul(_), [x; y] -> Llvm.build_mul x y "" builder
+  | Srem(_), [x; y; _] -> Llvm.build_srem x y "" builder
+  | Sdiv(_), [x; y; _] -> Llvm.build_sdiv x y "" builder
+  | Xor _, [x; y] -> Llvm.build_xor x y "" builder
+  | Or _, [x; y] -> Llvm.build_or  x y "" builder
+  | And _, [x; y] -> Llvm.build_and x y "" builder
+  | Not _, [x]    -> Llvm.build_not x "" builder
+  | Lsl a, [x; y] -> Llvm.build_shl  x (mk_shift a y) "" builder
+  | Lsr a, [x; y] -> Llvm.build_lshr x (mk_shift a y) "" builder
+  | Asr a, [x; y] -> Llvm.build_ashr x (mk_shift a y) "" builder
   (* Sign extend y to b. *)
-  | Value.Sext(a, b), [y] when a < b ->
+  | Cast(a, b), [y] when a < b ->
     Llvm.build_sext y (lltype_of_size b) "" builder
   (* Truncate y to b. *)
-  | Value.Sext(a, b), [y] when a > b ->
+  | Cast(a, b), [y] when a > b ->
     Llvm.build_trunc y (lltype_of_size b) "" builder
-  | Value.Sext(a, b), [y] (* when a = b *) -> y
-  | Value.Aeq(_), [x; y] ->
+  | Cast(a, b), [y] (* when a = b *) -> y
+  | Aeq(_), [x; y] ->
     to_bool (Llvm.build_icmp Llvm.Icmp.Eq  x y "" builder)
-  | Value.Less(_), [x; y] ->
+  | Less(_), [x; y] ->
     to_bool (Llvm.build_icmp Llvm.Icmp.Slt x y "" builder)
   (* TODO: can a proof object end up being compiled? If so, simply add
      an undef instruction here instead of raising an exception. *)
@@ -409,7 +408,7 @@ let setup_module name =
   ignore (Llvm.PassManager.initialize the_fpm);
   the_execution_engine, the_module, the_fpm
 
-type llproto = lltype * (var * lltype) list
+type llproto = lltype * (string * lltype) list
 
 let setup_fn the_module name (proto:llproto):Llvm.llvalue * llvalue Var_map.t =
   let names = Array.of_list (List.map fst (snd proto)) in
@@ -423,9 +422,9 @@ let setup_fn the_module name (proto:llproto):Llvm.llvalue * llvalue Var_map.t =
   in
   let p = Llvm.params f in
   let nameval i a =
-    let Variable n = names.(i) in
+    let n = names.(i) in
     Llvm.set_value_name n a;
-    Variable n, a
+    Var.of_string n, a
   in
   let nvals = Array.mapi nameval p in
   let m = Array.fold_right (fun (x, y) -> Base.Var_map.add x y)
@@ -435,7 +434,7 @@ let setup_fn the_module name (proto:llproto):Llvm.llvalue * llvalue Var_map.t =
 
 let main_engine, main_module, main_fpm = setup_module "IPL"
 
-let compile_function_ name (proto:llproto) (body:Value.el) invoke =
+let compile_function_ name (proto:llproto) (body:el) invoke =
   (* Format.printf "Body:%a\n@?" Printing.el body; *)
   let the_function, named_values = setup_fn main_module name proto in
   (* Create an entry block for alloca. *)
@@ -473,8 +472,8 @@ let compile_function_ name (proto:llproto) (body:Value.el) invoke =
     Llvm.delete_function the_function;
     raise e
 
-type proto = Value.size * (var * Value.size) list
-let compile_function name (proto:proto) (body:Value.el) invoke =
+type proto = size * (string * size) list
+let compile_function name (proto:proto) (body:el) invoke =
   let cod = lltype_of_size (fst proto) in
   let dom = List.map (fun (x, y) -> x, lltype_of_size y) (snd proto) in
   compile_function_ name (cod, dom) body invoke
@@ -482,27 +481,27 @@ let compile_function name (proto:proto) (body:Value.el) invoke =
 let generic_of_imm:imm -> Llvm_executionengine.GenericValue.t =
   let open Llvm_executionengine in
   function
-  | Value.Imm8 x -> GenericValue.of_int i8 (Char.code x)
-  | Value.Imm16 x -> GenericValue.of_int i16 x
-  | Value.Imm32 x -> GenericValue.of_int32 i32 x
-  | Value.Imm64 x -> GenericValue.of_int64 i64 x
-  | Value.Enum_cst(cs, c) -> GenericValue.of_int i32 (enum_ordinal cs c)
-  | Value.Refl -> raise Presupposition_error
+  | Imm8 x -> GenericValue.of_int i8 (Char.code x)
+  | Imm16 x -> GenericValue.of_int i16 x
+  | Imm32 x -> GenericValue.of_int32 i32 x
+  | Imm64 x -> GenericValue.of_int64 i64 x
+  | Enum_imm(cs, c) -> GenericValue.of_int i32 (enum_ordinal cs c)
+  | Refl -> raise Presupposition_error
 
 let generic_eq_imm (y:Llvm_executionengine.GenericValue.t) =
   let open Llvm_executionengine in
   function
-  | Value.Imm8 x -> GenericValue.as_int y = Char.code x
-  | Value.Imm16 x -> GenericValue.as_int y = x
-  | Value.Imm32 x -> GenericValue.as_int32 y = x
-  | Value.Imm64 x -> GenericValue.as_int64 y = x
-  | Value.Enum_cst(cs, c) -> GenericValue.as_int y = enum_ordinal cs c
-  | Value.Refl -> raise Presupposition_error
+  | Imm8 x -> GenericValue.as_int y = Char.code x
+  | Imm16 x -> GenericValue.as_int y = x
+  | Imm32 x -> GenericValue.as_int32 y = x
+  | Imm64 x -> GenericValue.as_int64 y = x
+  | Enum_imm(cs, c) -> GenericValue.as_int y = enum_ordinal cs c
+  | Refl -> raise Presupposition_error
 
 let size_of_imm = function
-  | Value.Imm8 _ -> Value.I8
-  | Value.Imm16 _ -> Value.I16
-  | Value.Imm32 _ -> Value.I32
-  | Value.Imm64 _ -> Value.I64
-  | Value.Enum_cst(_, _) -> Value.I32
-  | Value.Refl -> raise Presupposition_error
+  | Imm8 _ -> I8
+  | Imm16 _ -> I16
+  | Imm32 _ -> I32
+  | Imm64 _ -> I64
+  | Enum_imm(_, _) -> I32
+  | Refl -> raise Presupposition_error
