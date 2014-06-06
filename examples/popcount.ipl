@@ -1,0 +1,35 @@
+val (-) = mod64::-;
+val (+) = mod64::+;
+val (*) = mod64::*;
+val lsr = mod64::lsr;
+val and = mod64::and;
+
+val fun popcount(x0 i64) i8 =
+(
+ val x1 = x0 - and(lsr(x0, 1c), 0x5555555555555555);
+ val x2 = and(x1, 0x3333333333333333) + and(lsr(x1, 2c), 0x3333333333333333);
+ val x3 = and(x2 + lsr(x2, 4c), 0x0f0f0f0f0f0f0f0f);
+ mod64::to_i8(lsr(x3 * 0x0101010101010101, 56c))
+);
+
+assert popcount(0q) = 0c is i8;
+assert popcount(1q) = 1c is i8;
+assert popcount(2q) = 1c is i8;
+assert popcount(3q) = 2c is i8;
+assert popcount(4q) = 1c is i8;
+assert popcount(0x0101010101010101) = 8c is i8;
+assert popcount(0xffffffffffffffff) = 64c is i8;
+assert popcount(0xf0f0f0f0f0f0f0f0) = 32c is i8;
+assert popcount(0x0f0f0f0f0f0f0f0f) = 32c is i8;
+
+compile popcount(x i64) i8 = block { yield(popcount(x)); };
+
+test popcount(0q) = 0c;
+test popcount(1q) = 1c;
+test popcount(2q) = 1c;
+test popcount(3q) = 2c;
+test popcount(4q) = 1c;
+test popcount(0x0101010101010101) = 8c;
+test popcount(0xffffffffffffffff) = 64c;
+test popcount(0xf0f0f0f0f0f0f0f0) = 32c;
+test popcount(0x0f0f0f0f0f0f0f0f) = 32c;
