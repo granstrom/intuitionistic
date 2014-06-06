@@ -29,7 +29,7 @@ OCAMLOPTFLAGS=$(INCLUDES) -p
 
 # ========== MAIN TARGETS
 
-all: test_expr test_llvm iplc iplc.opt ipltop
+all: test_term test_expr test_llvm iplc iplc.opt ipltop
 
 test: all
 	./test_term
@@ -106,7 +106,7 @@ test_expr: $(TEST_EXPR_OBJS)
 LEVEL3=$(LEVEL2) ipl_compile.cmo ipl_llvm.cmo
 
 LLVM_LIBS=llvm.cma llvm_executionengine.cma llvm_analysis.cma llvm_scalar_opts.cma llvm_target.cma llvm_bitwriter.cma
-LLVM_FLAGS=-ccopt '-Wl,-lstdc++'
+LLVM_FLAGS=-ccopt -lstdc++
 
 TEST_LLVM_OBJS=$(LEVEL3) test_llvm.cmo
 test_llvm: $(TEST_LLVM_OBJS)

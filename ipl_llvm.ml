@@ -370,11 +370,12 @@ let setup_module name =
   ignore (initialize_native_target ());
   (* Create the JIT. *)
   let the_execution_engine = ExecutionEngine.create the_module in
+  (* Should be 'create' instead of create_function? *)
   let the_fpm = Llvm.PassManager.create_function the_module in
   (* Set up the optimizer pipeline.  Start with registering info about how the
    * target lays out data structures. *)
-  Llvm_target.DataLayout.add
-    (ExecutionEngine.target_data the_execution_engine) the_fpm;
+  Llvm_target.DataLayout.add_to_pass_manager the_fpm
+    (ExecutionEngine.data_layout the_execution_engine);
   (* Promote alloca slots that have only loads and stores to registers. *)
   Llvm_scalar_opts.add_memory_to_register_promotion the_fpm;
   (* Simplify the control flow graph (deleting unreachable blocks, etc). *)
