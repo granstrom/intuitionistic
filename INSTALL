@@ -1,8 +1,8 @@
 REQUIREMENTS:
 
-- Ocaml v4.00 or later.
+- Ocaml v4.00 or later (tested with Ocaml 4.01).
 
-- LLVM 3.3 or later, installed with OCaml bindings. Easiest way to get
+- LLVM 3.4.1, installed with OCaml bindings. Easiest way to get
   these is to build LLVM from source (after having installed OCaml).
 
 
