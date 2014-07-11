@@ -31,8 +31,6 @@ and el =
 | Sigma_u of el * el fn
 (* The universe code for the Id set. *)
 | Id_u of el * el * el
-(* Arrays of fixed size. *)
-| Array_u of el * el
 (* The universe code for the Tree set. *)
 | Tree_u of el * el
 (* The universe code for an enumerated set. *)
@@ -47,8 +45,6 @@ and el =
 | Ret of el
 (* Canonical element on invoke form of the Tree set. *)
 | Invk of el * el fn
-(* Array constant. *)
-| Array_cst of el array
 (* Noncanonical value-level element. *)
 | Neut of neut
 (* A 'hole' has the property that destructor(hole) = hole. A hole is
@@ -69,14 +65,6 @@ and neut =
 | Enum_d of neut * set fn * el Lazy.t enum_map
 (* Destructor of Id set. *)
 | Subst of neut * set fn fn * el
-(*
-   Destructor of the Array set.
-   Note that aref(ar, n, proof) : A,
-   where ar:array(A, m), n:i32 and proof : is_true(n < m).
-*)
-| Aref1 of neut * el * el
-| Aref2 of el array * neut * el
-| Aref3 of el array * int32 * neut
 (* Lifting of component. *)
 | For of neut * el fn * el * el fn
 (* Bind operation on programs. *)
@@ -109,8 +97,6 @@ and set =
 | Sigma of set * set fn
 (* The Id set of equality proofs. *)
 | Id of set * el * el
-(* Arrays of fixed size. *)
-| Array of set * el
 (* The Tree set of programs (interface * type). *)
 | Tree of el * el
 (* Enumerated sets. *)
@@ -199,7 +185,6 @@ let rec eq_set (x : set) (y : set) : unit =
   | Tree(i, a), Tree(ii, aa) ->
     eq_el i ii; eq_el a aa
   | Id(a, b, c), Id(aa, bb, cc) -> eq_set a aa; eq_el b bb; eq_el c cc
-  | Array(a, n), Array(aa, nn) -> eq_set a aa; eq_el n nn
   | Enum a, Enum b when Enum_set.equal a b -> ()
   | Imm_set a, Imm_set b when a = b -> ()
   | Type, Type -> ()
@@ -218,7 +203,6 @@ and eq_el (x : el) (y : el) : unit =
   | Tree_u(i, a), Tree_u(ii, aa) ->
     eq_el i ii; eq_el a aa
   | Id_u(a, b, c), Id_u(aa, bb, cc) -> eq_el a aa; eq_el b bb; eq_el c cc
-  | Array_u(a, n), Array_u(aa, nn) -> eq_el a aa; eq_el n nn
   | Enum_u a, Enum_u b when Enum_set.equal a b -> ()
   | Imm_set_u a, Imm_set_u b when a = b -> ()
   | Lambda(f), Lambda(g) -> fork eq_el f g
@@ -233,7 +217,6 @@ and eq_el (x : el) (y : el) : unit =
   | Neut(c), Pair(a, b) -> eq_el (Neut (Fst c)) a; eq_el (Neut (Snd c)) b
   | Ret(a), Ret(aa) -> eq_el a aa
   | Invk(c, t), Invk(cc, tt) -> eq_el c cc; fork eq_el t tt
-  | Array_cst(a), Array_cst(aa) -> eq_el_array a aa
   | Neut(n), Neut(m) -> eq_neut n m
   | Hole, _
   | _, Hole -> ()
@@ -256,12 +239,6 @@ and eq_neut (x : neut) (y : neut) : unit =
   | App(n, v), App(nn, vv) -> eq_neut n nn; eq_el v vv
   | Fst(n), Fst(nn)
   | Snd(n), Snd(nn) -> eq_neut n nn;
-  | Aref1(n, a, b), Aref1(nn, aa, bb) ->
-    eq_neut n nn; eq_el a aa; eq_el b bb
-  | Aref2(n, a, b), Aref2(nn, aa, bb) ->
-    eq_el_array n nn; eq_neut a aa; eq_el b bb
-  | Aref3(n, a, b), Aref3(nn, aa, bb) when a == aa->
-    eq_el_array n nn; eq_neut b bb
   | Enum_d(n, _C, a), Enum_d(nn, _CC, aa) ->
     begin
       eq_neut n nn; fork eq_set _C _CC;
@@ -334,8 +311,6 @@ let el_ordinal =
   | Id_u(_, _, _) -> 9
   | Enum_u(_) -> 10
   | Imm_set_u(_) -> 11
-  | Array_u(_) -> 12
-  | Array_cst(_) -> 13
   (* Hole cannot be compared. *)
   | Hole -> raise Presupposition_error
 
@@ -355,9 +330,6 @@ let neut_ordinal =
   | Purify(_, _) -> 11
   | Catch(_, _, _, _, _) -> 12
   | Builtin(_, _, _, _) -> 13
-  | Aref1(_, _, _) -> 14
-  | Aref2(_, _, _) -> 15
-  | Aref3(_, _, _) -> 16
 
 let component_ordinal = function
   | Component1(_) -> 0
@@ -384,11 +356,6 @@ let rec compare_el (x : el) (y : el) : int =
     cmpfold [lazy (compare_el a aa);
              lazy (compare_el b bb);
              lazy (compare_el c cc)]
-  | Array_u(a, b), Array_u(aa, bb) ->
-    cmpfold [lazy (compare_el a aa);
-             lazy (compare_el b bb)]
-  | Array_cst(a), Array_cst(aa) when Array.length a == Array.length aa ->
-    compare_arrays 0 (Array.length a) a aa
   | Enum_u a, Enum_u b -> Enum_set.compare a b
   | Imm_set_u a, Imm_set_u b -> compare a b
   | Lambda(f), Lambda(g) -> fork compare_el f g
@@ -418,18 +385,6 @@ let rec compare_el (x : el) (y : el) : int =
 
 and compare_neut (x : neut) (y : neut) : int =
   match x, y with
-  | Aref1(a, b, c), Aref1(aa, bb, cc) ->
-    cmpfold [lazy (compare_neut a aa);
-             lazy (compare_el b bb);
-             lazy (compare_el c cc)]
-  | Aref2(a, b, c), Aref2(aa, bb, cc) when Array.length a == Array.length aa ->
-    cmpfold [lazy (compare_arrays 0 (Array.length a) a aa);
-             lazy (compare_neut b bb);
-             lazy (compare_el c cc)]
-  | Aref3(a, b, c), Aref3(aa, bb, cc) when Array.length a == Array.length aa->
-    cmpfold [lazy (compare_arrays 0 (Array.length a) a aa);
-             lazy (compare b bb);
-             lazy (compare_neut c cc)]
   | For (n, _, _, f), For (m, _, _, g) ->
     cmpfold [lazy (compare_neut n m); lazy (fork compare_el f g)]
   | Bind (n, _, f), Bind (m, _, g) ->

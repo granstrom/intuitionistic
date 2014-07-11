@@ -41,7 +41,6 @@ type mono =
 | Pi_u of poly * poly fn
 | Sigma_u of poly * poly fn
 | Id_u of poly * poly * poly
-| Array_u of poly * poly
 | Tree_u of poly * poly
 | Enum_u of enum
 | Imm_set_u of size
@@ -54,7 +53,6 @@ type mono =
 | Fst of mono
 | Snd of mono
 | Enum_d of mono * set fn * poly enum_map
-| Aref of mono * poly * poly
 | Range of poly * poly
 | Subst of mono * set fn fn * poly
 | For of mono * poly fn * poly * poly fn
@@ -74,7 +72,6 @@ and poly =
   (* Constructors *)
 | Lambda of poly fn
 | Pair of poly * poly
-| Array_cst of poly array
 | Ret of poly
 | Invk of poly * poly fn
 (* Extra construct for let binding/beta redex. *)
@@ -87,7 +84,6 @@ and set =
 | Pi of set * set fn
 | Sigma of set * set fn
 | Id of set * poly * poly
-| Array of set * poly
 | Tree of poly * poly
 | Enum of enum
 | Imm_set of size
