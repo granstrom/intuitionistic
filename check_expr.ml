@@ -126,7 +126,6 @@ and interface_check (ctx:Ctx.ctx) (interf:Value.el) (in_expr:expr) : Value.el * 
     let _P = Eval.univ (Eval.mkFst interf) in
     let p'', p' = check_eval ctx _P p in
     let _A = Eval.mkApp (Eval.mkSnd interf) p'' in
-    (* TODO: use reflect. *)
     let cont = Reify.el_fam value_ret in
     _A, Term.Invk(p', cont)
 
@@ -140,14 +139,12 @@ and interface_check (ctx:Ctx.ctx) (interf:Value.el) (in_expr:expr) : Value.el * 
         let a'', a' = check_eval ctx _A' a in
         let _E = Pair(apv _B a'', lambda(fun z -> mkApp _C (Pair (a'', z)))) in
         let _D, pp = interface_check ctx _E p in
-        let dot_type = dot_type _A _B _C _D in
-        (* TODO: use reflect. *)
-        let dot_type_term = Reify.set dot_type in
+        let dot_type' = dot_type _A _B _C _D in
+        let dot_type_term = Reify.set dot_type' in
         assert(Check_term.set ctx dot_type_term; true);
-        (* TODO: use reflect. *)
         let dot = dot _A _B _C _D in
         let dot_term = Reify.el dot in
-        assert(Check_term.poly ctx dot_type dot_term; true);
+        assert(Check_term.poly ctx dot_type' dot_term; true);
         let fn = Term.Poly(dot_term, dot_type_term) in
         _D, Term.Mono(Term.App(Term.App(fn, a'), pp))
       | _ ->

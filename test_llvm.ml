@@ -85,7 +85,7 @@ let i32 x = Imm32 (Int32.of_int x)
 
 let _ = test "test1" (i32 10) ["x", i32 5]
 "block {
-val fun dup(z i32) tuple(_ i32, _ i32) = z, z;
+fun dup(z i32) tuple(_ i32, _ i32) = z, z;
 val (+) = mod32::(+);
 yield((+)(dup(x)));
 }"
@@ -95,7 +95,7 @@ let _ = test "test2" (i32 20) ["x", i32 10; "y", i32 11]
 "block {
 val (+) = mod32::(+);
 val (<) = mod32::(<);
-val fun dup(z i32) tuple(_ i32, _ i32) = z, z;
+fun dup(z i32) tuple(_ i32, _ i32) = z, z;
 val tmp tuple(_ i32, _ i32) = x < y ? dup(x) : dup(y);
 val tmp2 = fst(tmp) + snd(tmp);
 yield(tmp2);
@@ -130,7 +130,7 @@ yield(do c.call(fun(i)i));
 
 let _ = test "euler3" (i32 233168) ["x", i32 1000]
 "block {
-val fun (z bool) || (y bool) = z ? true : y;
+fun (z bool) || (y bool) = z ? true : y;
 val (==) = mod32::(==);
 val (+) = mod32::(+);
 val srem = mod32::srem;

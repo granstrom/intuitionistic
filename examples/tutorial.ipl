@@ -26,18 +26,18 @@ assert () = () is void;
 // The type 'bool' is predefined, but if it wasn't predefined, it
 // could have been defined as
 //
-// val bool = enum { false, true };
+// val bool = enum{false, true};
 //
 // Enum types are first class types, and their syntax is inspired by
 // C.
-assert bool = enum { false, true } is type;
+assert bool = enum{false, true} is type;
 
 // The order of the constants of an enum doesn't matter.
-assert enum { true, false } = enum { false, true } is type;
+assert enum{true, false} = enum{false, true} is type;
 
 // The constants of an enum are written with a quote,
-assert 'foo is enum { foo, bar };
-assert 'bar is enum { foo, bar };
+assert 'foo is enum{foo, bar};
+assert 'bar is enum{foo, bar};
 
 // The constants true and false are predefined.
 assert true = 'true is bool;
@@ -52,14 +52,14 @@ assert false = 'false is bool;
 // val <var> = <val>;
 
 // Define the empty type.
-val empty = enum {};
+val empty = enum{};
 
-// Functions are defined using the 'val fun' syntax.
-val fun sample_function1(x empty, y bool) = y;
+// Functions are defined using the 'fun' syntax.
+fun sample_function1(x empty, y bool) = y;
 
 // Define the abort function.
-val fun abort(t type) empty -> t = fun {};
-// The fun {...} construction is explained below.
+fun abort(t type) empty -> t = fun{};
+// The fun{...} construction is explained below.
 
 // Builtin type of unsigned 32-bit integers.
 assert i32 is type;
@@ -99,32 +99,33 @@ assert lsr(4, 2c) = 1 is i32;
 
 // A binary operation binop(t), on a type t, is a function from t
 // times t to t.
-val fun binop(t type) = tuple(_ t, _ t) -> t;
+fun binop(t type) = tuple(_ t, _ t) -> t;
 assert (+) is binop(i32);
 assert (-) is binop(i32);
 
 // A (decidable) binary relation binrel(t), on a set t, is a function
 // from t times t to bool.
-val fun binrel(t type) = tuple(_ t, _ t) -> bool;
+fun binrel(t type) = tuple(_ t, _ t) -> bool;
 assert (<) is binrel(i32);
 assert (==) is binrel(i32);
 
 // id is the polymorphic identity function.
-val fun id(t type) t -> t = fun(x) x;
+fun id(t type) t -> t = fun(x) x;
 
 // For example:
 assert id(bool) = fun(x) x is bool -> bool;
 
-// This function is not equal to the identity function id(void).
+// This constant function is not equal to the identity function
+// id(void).
 assert fun(_) () is void -> void;
 
-// The fun {...} construction is used to create a, possibly
+// The fun{...} construction is used to create a, possibly
 // dependently typed, function defined on an enumerated set.  For
 // example:
-val dep_type bool -> type = fun { true: i32, false: i64 };
+val dep_type bool -> type = fun{true: i32, false: i64};
 assert dep_type('true) = i32 is type;
 assert dep_type('false) = i64 is type;
-val dep_fun dep(x bool) -> dep_type(x) = fun {
+val dep_fun dep(x bool) -> dep_type(x) = fun{
   true: 100,
   false: 1000000000q
 };
@@ -133,24 +134,31 @@ val dep_fun dep(x bool) -> dep_type(x) = fun {
 assert dep_fun(true) = 100 is i32;
 assert dep_fun(false) = 1000000000q is i64;
 
-// Dependently typed functions work just like normal
-// function. However, one difference is that non-dependent functions
-// can be applied without having a known type, for example:
+// Dependently typed functions work just like normal function, with
+// one difference, viz., that non-dependent functions can be applied
+// without having a known type, for example:
 assert (fun(x) x + x)(1) = 2 is i32;
 // This doesn't work for dependently typed functions. For example, the
 // following assertion will give an error.
 //
-// assert fun { true: 100, false: 1000000000q }(true) = 100 is i32;
+// assert fun{true: 100, false: 1000000000q}(true) = 100 is i32;
+//
+// This is because the type checking algorithm will erronously deduce
+// that fun{...} must have type bool->i32, and the subsequent checking
+// of this will fail.
 
 // Boolean negation is written as in C.
-val fun !(x bool) = x ? false : true;
+fun !(x bool) = x ? false : true;
+// A unary operator is accessed as a function by putting it within
+// parenthesis followed by a dot. Without the dot, the corresponding
+// binary operator is referenced (if there is one, such as for minus).
 assert (!.) is bool -> bool;
 // Complete specification!
 assert !true = false is bool;
 assert !false = true is bool;
 
 // Boolean conjunction is written as in C.
-val fun (x bool) && (y bool) = x ? y : false;
+fun (x bool) && (y bool) = x ? y : false;
 assert (&&) is binop(bool);
 // Complete specification!
 assert true && true = true is bool;
@@ -162,7 +170,7 @@ assert fun(x) true && x = id(bool) is  bool -> bool;
 assert fun(x) false && x = fun(x) false is  bool -> bool;
 
 // Boolean disjunction is written as in C.
-val fun (x bool) || (y bool) = x ? true : y;
+fun (x bool) || (y bool) = x ? true : y;
 // Complete specification!
 assert true || true = true is bool;
 assert true || false = true is bool;
@@ -171,7 +179,7 @@ assert false || false = false is bool;
 assert fun(x) false || x = fun(x) x is  bool -> bool;
 assert fun(x) true || x = fun(x) true is bool -> bool;
 
-val fun (x bool) ^^ (y bool) = x ? !y : y;
+fun (x bool) ^^ (y bool) = x ? !y : y;
 // Complete specification!
 assert true ^^ true = false is bool;
 assert true ^^ false = true is bool;
@@ -182,19 +190,19 @@ assert fun(x) true ^^ x = fun(x) !x is bool -> bool;
 
 // Syntax of structs.
 val sample_struct1 = struct {};
-val sample_struct2 = struct {a: bool };
+val sample_struct2 = struct {a: bool};
 val sample_struct3 = struct {a: bool, b: i32};
 
 // A struct is simply a dependently typed function from an enumerated
 // set.
 assert struct {x: bool, y: i32} =
-    dep(z enum {x, y}) -> fun { x: bool, y: i32}(z)
+    dep(z enum{x, y}) -> fun{x: bool, y: i32}(z)
 is type;
 
 // Records.
-val record1  sample_struct1 = fun {};
-val record2  sample_struct2 = fun {a: true };
-val record3  sample_struct3 = fun {a:true, b: 42};
+val record1  sample_struct1 = fun{};
+val record2  sample_struct2 = fun{a: true};
+val record3  sample_struct3 = fun{a:true, b: 42};
 
 // Record fields can be accessed using the following notation:
 assert record3::a = true is bool;
@@ -205,26 +213,27 @@ assert record2('a) = true is bool;
 
 // A union is a dependently typed pair with an enumerated first
 // component. For example:
-val sample_union1 = union {};
-val sample_union2 = union {a: bool};
-val sample_union3 = union {a: bool, b: sample_struct3};
+val sample_union1 = union{};
+val sample_union2 = union{a: bool};
+val sample_union3 = union{a: bool, b: sample_struct3};
 
 // The normal syntax for pairs can be used to create union objects.
 assert ('a, true) is sample_union2;
-assert ('b, fun { a:true, b:0 }) is sample_union3;
+assert ('b, fun{a:true, b:0}) is sample_union3;
 
 // However, the following notation is often more convenient:
 assert a@true = ('a, true) is sample_union2;
 
-// The fun {...} notation is extended to work on unions.
+// The fun{...} notation is extended to work on unions.
 val sample_union_fun sample_union3 -> bool =
-    fun { a@x: !x, b@y: y::a };
+    fun{a@x: !x, b@y: y::a};
 
 assert sample_union_fun(a@false) = true is bool;
 
-// The type 'interface' is defined as union(x type, x -> type). The
+// The type 'interface' is defined as tuple(x type, _ x -> type). The
 // constant 'cmd' extracts the commands' of an interface.
 assert cmd = fun(i) fst(i) is interface -> type;
+assert cmd = fun(i) fst(i) is tuple(x type, _ x -> type) -> type;
 
 // The constant 'res' extracts the type of responses to a command.
 assert res = fun(i, x) snd(i)(x) is
@@ -234,14 +243,14 @@ assert res = fun(i, x) snd(i)(x) is
 // Interfaces can be created using normal pair notatation. For
 // example:
 assert (i32, fun(_) void) is interface;
-assert (bool, fun { true: i32, false: void }) is interface;
+assert (bool, fun{true: i32, false: void}) is interface;
 
 // The following notation is a convenient alternative:
 assert meth(_ i32) void = (i32, fun(_) void) is interface;
 
 // Two often useful interface:
-val fun reader(A type) interface = meth(_ void) A;
-val fun writer(A type) interface = meth(_ A) void;
+fun reader(A type) interface = meth(_ void) A;
+fun writer(A type) interface = meth(_ A) void;
 
 // The meth {...} can be used to create interfaces where the set of
 // commands is a union.
@@ -252,17 +261,14 @@ val systemX = meth {
 
 // To understand how this works, it is important to first understand
 // how to take the product of a family of interfaces.
-val fun interface_prod(A type, F A -> interface) interface =
+fun interface_prod(A type, F A -> interface) interface =
   meth(x A, y cmd(F(x))) res(F(x), y);
 
-val systemX_cmd = enum { do_something, print_int };
-val systemX_res systemX_cmd -> interface = fun {
+val systemX_cmd = enum{do_something, print_int};
+val systemX_res systemX_cmd -> interface = fun{
   do_something: meth(x void) bool,
   print_int: meth(_ i32) void
 };
-assert systemX =
-    interface_prod(systemX_cmd, systemX_res)
-is interface;
 
 // The 'call' syntax is used to create a procedure that invokes a
 // command on an interface and returns its result.
@@ -276,16 +282,16 @@ assert block {
   val x = do call(do_something@());
   if x {
     do print_int.call(100);
-  }
+ }
 } is systemX => void;
 
-// A procedure can be "interpreted" using the interpret syntax.  For
+// A procedure can be "interpreted" using the 'interpret' syntax.  For
 // example, a fake systemX can be defined over the empty interface.
-val fun fake_systemX(A type, prog systemX => A) meth {} => A = interpret prog {
-  fun {
-    do_something@_: block { yield(true); } ,
-    print_int@_: block { }
-  }
+fun fake_systemX(A type, prog systemX => A) meth {} => A = interpret prog {
+  fun{
+    do_something@_: block {yield(true);} ,
+    print_int@_: block {}
+ }
 };
 
 // When dealing with composite interfaces, the dot operation is often
@@ -296,13 +302,13 @@ assert print_int.call(10) is systemX => void;
 
 // The dot syntax can be generalised to the case when the left hand
 // side is not an enum literal.
-val fun dot(A type,
+fun dot(A type,
             F A -> interface,
             D type,
             a A,
             p F(a) => D)
     interface_prod(A, F) => D =
-  interpret p { fun(x) call(a, x) }
+  interpret p {fun(x) call(a, x)}
 ;
 
 // For example:
@@ -317,14 +323,14 @@ is i32 -> systemX => void;
 
 
 // For loops are often used in conjuction with ranges.
-val fun systemX_example(x i32) systemX => void = block {
+fun systemX_example(x i32) systemX => void = block {
   for y in 0 .. x {
     val ok = do call(do_something@());
     if ok {
       do call(print_int@y);
-    }
+   }
     do call(print_int@0);
-  }
+ }
 };
 
 // In addition their usefulness for generic programming with structs,
@@ -332,8 +338,8 @@ val fun systemX_example(x i32) systemX => void = block {
 // expressing properties of objects. A popular example is division.
 //
 // First we introduce the following syntax:
-val fun is_true(x bool) type = x eq(bool) true;
-val fun is_false(x bool) type = x eq(bool) false;
+fun is_true(x bool) type = x eq(bool) true;
+fun is_false(x bool) type = x eq(bool) false;
 
 // The special syntax "x eq(X) y" is used to express a special
 // equality type.
@@ -351,7 +357,7 @@ assert mod32::sdiv is tuple(_ i32, y i32, _ is_true(0 < y)) -> i32;
 // Well, this works fine for unsigned integers, but for signed
 // integers hardware often imposes the special restriction that
 // division of MIN_INT by -1 is undefined. To avoid a fourth argument
-// to sdiv, I instead restricted it to positive dividends.
+// to sdiv, IPL restricts it to positive dividends.
 
 // For example, we have
 assert mod32::sdiv(10, 2, refl) = 5 is i32;
@@ -361,7 +367,7 @@ assert mod32::sdiv(10, 2, refl) = 5 is i32;
 // The following construct demonstrates that a boolean is either true
 // or false.
 val is_true_or_false
-    dep(x bool) -> union { true: is_true(x), false: is_false(x) } = fun {
+    dep(x bool) -> union{true: is_true(x), false: is_false(x)} = fun{
   true: true@refl,
   false: false@refl
 };

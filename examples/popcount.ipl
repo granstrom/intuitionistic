@@ -4,7 +4,7 @@ val (*) = mod64::*;
 val lsr = mod64::lsr;
 val and = mod64::and;
 
-val fun popcount(x0 i64) i8 =
+fun popcount(x0 i64) i8 =
 (
  val x1 = x0 - and(lsr(x0, 1c), 0x5555555555555555);
  val x2 = and(x1, 0x3333333333333333) + and(lsr(x1, 2c), 0x3333333333333333);

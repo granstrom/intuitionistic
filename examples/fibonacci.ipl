@@ -14,7 +14,7 @@ val (+) = mod32::+;
 
 // This is a simple but reasonably efficent implementation of the
 // Fibonacci function.
-val fun fib(x i32) = purify i32 {
+fun fib(x i32) = purify i32 {
   new a = new_i32(0);
   new b = new_i32(1);
   for _ in 0..x {
@@ -64,19 +64,18 @@ test fib(46) = 1836311903;
 //   ret i32 %a
 // }
 
-
 val (<) = mod32::<;
 val (==) = mod32::==;
-val fun (x bool) && (y bool) = x ? y : false;
-val fun (x bool) || (y bool) = x ? true : y;
-val fun (x i32) <= (y i32) = x < y || x == y;
+fun (x bool) && (y bool) = x ? y : false;
+fun (x bool) || (y bool) = x ? true : y;
+fun (x i32) <= (y i32) = x < y || x == y;
 val and = mod32::and;
 
-val fun (I interface) ++ (J interface) interface = meth {
+fun (I interface) ++ (J interface) interface = meth {
   false: I,
   true: J
 };
-val fun !(x bool) = x ? false : true;
+fun !(x bool) = x ? false : true;
 
 val i_range interface = meth(_ i32) void;
 val range type = i_range => void;
@@ -87,12 +86,12 @@ assert catch is
 dep(b type) ->
 dep(i interface) ->
 dep(a type) ->
-dep(f b -> i => a) ->
+dep(_ b -> i => a) ->
 (i ++ (meth(_ b) enum{}) => a) ->
 i => a;
 
 
-val fun breakable(rng range) break =
+fun breakable(rng range) break =
 catch(void)(i_break)(bool)(fun(_) block { yield(false); })(
 block {
   for c in rng {
@@ -115,7 +114,7 @@ block {
 // continue, and, more generally, an efficiently implemented
 // throw/catch construct that can be used to break out of (possibly
 // nested) loops.
-val fun euler2(max i32) = purify i32 {
+fun euler2(max i32) = purify i32 {
   new sum = new_i32(0);
   val _ bool = for i in breakable(0..max) {
     val a = fib(i);
@@ -228,3 +227,57 @@ test euler2(4000000) = 4613732;
 //   %phitmp = select i1 %43, i32 2, i32 0
 //   br label %merge37
 // }
+
+fun writer(A type) interface = meth(_ A) void;
+
+// A similar logic can be used to compute a sequence of Fibonacci
+// numbers.
+fun fib_seq(x i32) writer(i32) => void = block {
+  val s meth { doit: meth(_ i32)void } => void = block {
+    new a = new_i32(0);
+    new b = new_i32(1);
+    for _ in 0..x {
+      val old_a = get a;
+      val old_b = get b;
+      a := old_b;
+      val new_b = old_a + old_b;
+      b := new_b;
+      do call(doit@new_b);
+    }
+  };
+  val ss writer(i32) => void = interpret s {
+    fun {
+      doit@y: block { do call(y); }
+    }
+  };
+  yield(do ss);
+};
+
+// Should
+//     continue;
+// be an abbreviation for
+//     yield('continue);
+// ? and similar for break?
+fun euler2v2(max i32) = purify i32 {
+  new sum = new_i32(0);
+  val _ bool = for i in breakable(fib_seq(max)) {
+    if i <= max {
+      if and(i, 1) == 0 {
+        sum := sum + i;
+      }
+      yield(true);  // continue
+    } else {
+      yield(false);  // break
+    }
+  }
+  yield(get sum);
+};
+
+// Check that we have a correct solution.
+assert euler2v2(4000000) = 4613732 is i32;
+
+// Compile the solution to the second Euler problem.
+compile euler2v2(max i32) i32 = block { yield(euler2(max)); };
+
+// Check that the compiled function works too.
+test euler2v2(4000000) = 4613732;

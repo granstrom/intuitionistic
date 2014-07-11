@@ -1,7 +1,7 @@
 // This file demonstrates how IPL eliminates closures and pairs during
 // compilation.
 
-val fun seq(A type) = (meth(_ A) void) => void;
+fun seq(A type) = (meth(_ A) void) => void;
 
 val (-.) = mod32::(-.);
 val (-) = mod32::-;
@@ -9,14 +9,14 @@ val (+) = mod32::+;
 val (*) = mod32::*;
 val (<) = mod32::<;
 val sdiv = mod32::sdiv;
-val fun is_true(x bool) type = x eq(bool) true;
-val fun is_false(x bool) type = x eq(bool) false;
+fun is_true(x bool) type = x eq(bool) true;
+fun is_false(x bool) type = x eq(bool) false;
 
 val mean_variance = struct { mean: i32, variance: i32 };
 
 // This is a function that performs a computation and returns a
 // "closure".
-val fun compute_mean_and_variance(s seq(i32)) =
+fun compute_mean_and_variance(s seq(i32)) =
 purify tuple(x i32, _ is_true(0 < x)) -> mean_variance {
   new sum = new_i32(0);
   new squares = new_i32(0);

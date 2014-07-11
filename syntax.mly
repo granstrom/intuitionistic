@@ -192,14 +192,14 @@ file:
   loc 1 6,
   Val(loc 2 2, $2, (loc 3 5, Decl($5, $3)), $7)
 }
-| VAL FUN fun_arglist EQ expr SEMI file {
-  let (f, fl), (x, _A) = $3 in
-  loc 1 6, Val(fl, f, (fst $5, Pattern(Some _A, (x, $5))), $7)
+| FUN fun_arglist EQ expr SEMI file {
+  let (f, fl), (x, _A) = $2 in
+  loc 1 5, Val(fl, f, (fst $4, Pattern(Some _A, (x, $4))), $6)
 }
-| VAL FUN fun_arglist expr EQ expr SEMI file {
-  let (f, fl), (x, _A) = $3 in
-  let body = loc 4 6, Decl($6, $4) in
-  loc 1 7, Val(fl, f, (fst body, Pattern(Some _A, (x, body))), $8)
+| FUN fun_arglist expr EQ expr SEMI file {
+  let (f, fl), (x, _A) = $2 in
+  let body = loc 3 5, Decl($5, $3) in
+  loc 1 6, Val(fl, f, (fst body, Pattern(Some _A, (x, body))), $7)
 }
 | COMPILE ident LPAREN compile_arglist RPAREN expr EQ expr SEMI file {
   loc 1 9, Compile($2, $4, $6, $8, $10)
@@ -374,16 +374,16 @@ val_stmt:
 | VAL pattern expr EQ opaque_opt expr SEMI {
   fun x -> loc 1 7, Let($5, (loc 3 6, Decl($6, $3)), ($2, x))
 }
-| VAL FUN fun_arglist EQ opaque_opt expr SEMI {
-  let (f, frange), (x, _A) = $3 in
-  fun y -> loc 1 7,
-    Let($5, (loc 6 6, Pattern(Some _A, (x, $6))),
+| FUN fun_arglist EQ opaque_opt expr SEMI {
+  let (f, frange), (x, _A) = $2 in
+  fun y -> loc 1 6,
+    Let($4, (loc 5 5, Pattern(Some _A, (x, $5))),
         (Pvar(frange, f), y))
 }
-| VAL FUN fun_arglist expr EQ opaque_opt expr SEMI {
-  let (f, frange), (x, _A) = $3 in
-  fun y -> loc 1 8,
-    Let($6, (loc 4 7, Pattern(Some _A, (x, (loc 4 7, Decl($7, $4))))),
+| FUN fun_arglist expr EQ opaque_opt expr SEMI {
+  let (f, frange), (x, _A) = $2 in
+  fun y -> loc 1 7,
+    Let($5, (loc 3 6, Pattern(Some _A, (x, (loc 3 6, Decl($6, $3))))),
         (Pvar(frange, f), y))
 }
 ;

@@ -8,12 +8,13 @@
 
 // First some useful abbreviations, the first of which should be a
 // part of the initially opened module.
-val fun (x bool) || (y bool) = x ? true : y;
+fun (x bool) || (y bool) = x ? true : y;
 val srem = mod32::srem;
 val (+) = mod32::(+);
 val (==) = mod32::(==);
 
-val fun euler1(x i32) = purify i32 {
+fun euler1(x i32) =
+purify i32 {
   new c = new_i32(0);
   for z in 0..x {
     if srem(z, 3, refl) == 0 || srem(z, 5, refl) == 0 {

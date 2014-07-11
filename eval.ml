@@ -524,6 +524,20 @@ let empty_interface =
   Pair(Sigma_u(empty_u, Fn(abort Type)),
        lambda(fun x -> abort Type (mkFst x)))
 
+(*
+   E = enum { c1; ...; cn } : set
+   B : E -> set
+   n : union(x:E):B(x)
+   C : union(x:E):B(x) -> set
+   cs[ci] : func(y:B(ci)):C(ci, y)
+   -----
+   mkEnum_d2 n B C cs : C(n)
+*)
+let mkEnum_d2 n _B _C cs =
+  let open Value in
+  let _D x = Pi(apv _B x, Fn(fun y -> apv _C (Pair(x, y)))) in
+  mkApp (mkEnum_d (mkFst n) (Fn _D) cs) (mkSnd n)
+
 let methods is_list =
   let is = enum_map_make is_list in
   let is_set = enum_of_enum_map is in
@@ -611,20 +625,6 @@ let dot
       mkFor p (Fn(fun y -> mkApp _C (Pair(a, y))))
 	(Pair(Sigma_u(_A, _B), _C)) (Fn(fun c ->
 	  Value.Invk(Pair(a, c), Fn(fun z -> Value.Ret z))))))
-
-(*
-   E = enum { c1; ...; cn } : set
-   B : E -> set
-   n : union(x:E):B(x)
-   C : union(x:E):B(x) -> set
-   cs[ci] : func(y:B(ci)):C(ci, y)
-   -----
-   mkEnum_d2 n B C cs : C(n)
-*)
-let mkEnum_d2 n _B _C cs =
-  let open Value in
-  let _D x = Pi(apv _B x, Fn(fun y -> apv _C (Pair(x, y)))) in
-  mkApp (mkEnum_d (mkFst n) (Fn _D) cs) (mkSnd n)
 
 let zero_of_size =
   let open Value in

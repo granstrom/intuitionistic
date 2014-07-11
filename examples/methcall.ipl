@@ -14,7 +14,7 @@ val I_toggle = meth {
 };
 
 // This interface is used internally in IPL to implement the 'new' construct.
-val fun (I interface) ++ (J interface) interface = meth {
+fun (I interface) ++ (J interface) interface = meth {
   false: I,
   true: J
 };
@@ -63,7 +63,7 @@ val (-) = mod32::-;
 // current implementation of IPL, and has the virtue of revealing how
 // classes are implemented "under the hood".
 
-val fun toggle_helper(
+fun toggle_helper(
   I interface, A type, prog I ++ I_toggle => A) I ++ prop32 => A =
 interpret prog {
   fun {
@@ -75,7 +75,7 @@ interpret prog {
   }
 };
 
-val fun toggle(start_state bool)
+fun toggle(start_state bool)
   dep(I interface) ->
   dep(A type) ->
   tuple(J interface, _ (I ++ J => A) -> I => A) =

@@ -1,8 +1,8 @@
-val fun (I interface) ++ (J interface) interface = meth {
+fun (I interface) ++ (J interface) interface = meth {
   false: I,
   true: J
 };
-val fun !(x bool) = x ? false : true;
+fun !(x bool) = x ? false : true;
 
 val i_range interface = meth(_ i32) void;
 val range type = i_range => void;
@@ -17,7 +17,7 @@ dep(f b -> i => a) ->
 i => a;
 
 
-val fun breakable(rng range) i_break => i32 =
+fun breakable(rng range) i_break => i32 =
 catch(i32)(i_break)(i32)(fun(n) block { yield(n); })(
 block {
   for c in rng {
@@ -32,13 +32,13 @@ val (*) = mod32::*;
 val (<) = mod32::<;
 
 // Example: compute integer square root of x.
-val fun isqrt(x i32) = purify i32 {
+fun isqrt(x i32) = purify i32 {
   new square = new_i32(0);
   for i in breakable(0..x) {
     val old_square = get square;
     val new_square = old_square + 2 * i + 1;
     if x < new_square {
-      yield(false);
+      yield(false); // break;
     } else {
       square := new_square;
       yield(true);  // continue;

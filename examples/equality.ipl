@@ -12,8 +12,8 @@ val unit = enum { nil };
 val unitfn = unit -> unit;
 
 // Three functions unit -> unit.
-val fun constant(x unit) unit = 'nil;
-val fun identity(x unit) = x;
+fun constant(x unit) unit = 'nil;
+fun identity(x unit) = x;
 val cases unitfn = fun { nil: 'nil};
 
 // Let's check that they indeed have the same type.
@@ -30,7 +30,7 @@ assert cases is unitfn;
 
 // Let's use infix equality (==) for equality between elements of the
 // set unit.
-val fun (x unit) == (y unit) = x eq(unit) y;
+fun (x unit) == (y unit) = x eq(unit) y;
 
 // In fact, despite being definitionally distinct, the three functions
 // are in fact extensionally equal, as demonstrated by.
@@ -43,7 +43,7 @@ val identity_eq_cases dep(x unit) -> identity(x) == cases(x) =
 
 // This is not surprising in view of the fact that the unit set is
 // collapsed in the following sense.
-val fun collapsed(x unit, y unit) x == y = (
+fun collapsed(x unit, y unit) x == y = (
   val tmp dep(xx unit) -> dep(yy unit) -> xx == yy =
     fun { nil: fun { nil: refl }};
   tmp(x)(y)

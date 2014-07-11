@@ -83,7 +83,7 @@ let parse_set str =
   maybe_print (Printf.sprintf "OK: success set '%s'\n" str)
 
 let _ = parse_string "(val x = true; x)"
-let _ = parse_string "(val fun f(x i32) i32 = x; f)"
+let _ = parse_string "(fun f(x i32) i32 = x; f)"
 let _ = parse_set "enum {false,true}"
 let _ = parse_set "enum {}"
 let _ = parse_set "dep(x enum {false,true}) -> dep(y type) -> y"
@@ -127,11 +127,11 @@ val test_for2 = block (meth(_ i32)bool) => void {
 }; () )"
 
 let _ = parse_string "(
-val fun (||)(z bool, y bool) bool = z ? true : y;
+fun (||)(z bool, y bool) bool = z ? true : y;
 val (==) = mod32::(==);
 val (+) = mod32::(+);
 val srem = mod32::srem;
-val fun euler2(x i32) = block meth {} => i32 {
+fun euler2(x i32) = block meth {} => i32 {
  new c = new_i32(0);
  for z in 0..x {
    if srem(z, 3, refl) == 0 || srem(z, 5, refl) == 0 {
@@ -146,10 +146,10 @@ val fun euler2(x i32) = block meth {} => i32 {
 
 let _ = parse_string "(
 val (==) = mod32::(==);
-val fun (||)(z bool, y bool) bool = z ? true : y;
+fun (||)(z bool, y bool) bool = z ? true : y;
 val (+) = mod32::(+);
 val srem = mod32::srem;
-val fun euler2(x i32) = block meth {} => i32 {
+fun euler2(x i32) = block meth {} => i32 {
  new c = new_i32(0);
  for z in 0..x {
    if srem(z, 3, refl) == 0 || srem(z, 5, refl) == 0 {

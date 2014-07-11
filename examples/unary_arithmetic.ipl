@@ -3,12 +3,12 @@
 // IPL, as there are no recursive datatypes. However, we can do some
 // interesting things with interfaces and procedures.
 
-// A unary number is represented by a sequence of calls on an
+// A unary number is represented by a sequence of calls on the trivial
 // interface.
 val unary = (meth(_ void)void) => void;
 
 // An integer can be converted to a unary integer.
-val fun i2u(x i32) unary = block {
+fun i2u(x i32) unary = block {
   for _ in 0..x {
     do call();
   }
@@ -23,7 +23,7 @@ assert i2u(3) = block {
 
 
 // A unary integer can be converted to an integer.
-val fun u2i(x unary) = purify i32 {
+fun u2i(x unary) = purify i32 {
   new c = new_i32(0);
   val (+) = mod32::+;
   for _ in x {
@@ -35,13 +35,13 @@ val fun u2i(x unary) = purify i32 {
 assert u2i(i2u(1000)) = 1000 is i32;
 
 // Unary integers can be added.
-val fun (x unary) + (y unary) unary = block {
+fun (x unary) + (y unary) unary = block {
   do x;
   do y;
 };
 
 // Unary integers can be multiplied.
-val fun (x unary) * (y unary) unary = block {
+fun (x unary) * (y unary) unary = block {
   for _ in x {
     do y;
   }
