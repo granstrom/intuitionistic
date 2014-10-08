@@ -1,0 +1,126 @@
+================================================================================
+
+IPL uses an extension of the algorithm described below to eliminate
+constructs that require memory allocation (and subsequently garbage
+collection) from programs written in a subset of intensional type
+theoy.
+
+In this note, I will use the following acronyms.
+
+ITT=intensional type theory with finite sets, Pi (ap, and lam with
+eta-rule), Sigma (pair, fst, snd with surjective pairing), Id (refl
+and Paulin-Mohring's elimination rule which I will call subst), and a
+universe.
+
+ETT+=extensional type theory with the same sets, plus the rule R,
+given by
+
+                    ci=c:F
+C:F -> set            ...
+c:F={c1,...,cn}   bi:C(ci)
+--------------------------------
+case'(c,b1,...,bn):C(c)
+
+That is, the typing of the branches bi:C(ci) only has to be correct
+under the assumption that ci=c:F.  Note that the family C can always
+be taken to be constantly C(c), as, in each branch, C(c)=C(ci) anyway.
+
+ETT+ ought to be consistent as the special case' operation can be
+defined in terms of the normal operation case.
+
+case'(c,b1,...,bn) = case(c,(lam x1)b1,...,(lam xn)bn)(refl(c)) : C(c)
+
+On the left side, the elimination family is C(x), whereas on the right
+side it is D(x)=Id(F,x,c)->C(x). Now bi is typed under the assumption
+that xi:Id(F,ci,c), and, by extensionality, the definitional equality
+can be assumed.
+
+Note that normal computer datatypes, like 64-bit integers, are finite
+sets. All hardware operations on such datatypes can formally be
+expressed in terms of the "case'" construct. However, their
+implementations can of course be in terms of machine instructions.
+
+CONJECTURE.  If b:F0 (x1:F1,...,xn:Fn) in ITT, where Fi (i=0..n) are
+finite sets, then b=b0:F0 (x1:F1,...,xn:Fn) in ETT+ for some term b0
+(effectively computable from b) which only contains applications of
+case'.
+
+Proof idea. First normalize b in ITT.
+
+b=D1(D2(... Dk(xj)...)), where Di(n) has one of the neutral forms
+
+x (variable),
+case'(n,...),
+subst(a,b,n,d),
+ap(n,a),
+fst(n),
+snd(n).
+
+[Note the position of the 'n' in each form.]
+
+The following equalities hold in ETT+:
+
+1:subst(a,b,n,d)=d
+2:ap(case'(n,b1,...,bn),a)=case'(n,ap(b1,a),...,ap(bn,a))
+3:fst(case'(n,b1,...,bn))=case'(n,fst(b1),...,fst(bn))
+4:snd(case'(n,b1,...,bn))=case'(n,snd(b1),...,snd(bn))
+
+1: Here I've used Paulin-Mohring's subst rule
+
+a,b:A n:Id(A,a,b) d:C(a,refl(a))
+----------------------------------
+subst(a,b,n,d):C(b,n)
+
+In ETT+, n=refl, a=b, and subst(a,b,n,d)=d.
+
+2: For ap, assume that
+n:F={c1,...,cn}
+C(x)=(Pi y:A(x))B(x,y),
+case'(n,b1,...,bn):C(n),
+bi:C(ci),
+a:A(n).
+
+Using the rule R, given that ci=n:F, we have bi:C(n) and
+ap(bi,a):B(n,a), whence case'(n,ap(b1,a),...,ap(bn,a)):B(n,a).
+Furthermore, let
+
+P=Id(B(n,a),ap(case'(n,b1,...,bn),a),case'(n,ap(b1,a),...,ap(bn,a))).
+Then case'(n,refl,...,refl):P, whence equality 1 holds in ETT+. Note
+that the family of the case' is constantly P (i.e., P does not depend
+on n).
+
+3&4: Assume
+n:F={c1,...,cn}
+bi:(Sigma y:A(ci))B(ci,y),
+case'(n,b1,...,bn):(Sigma y:A(n))B(n,y)
+
+Assuming n=ci:F, bi:(Sigma y:A(n))B(n,y), and fst(bi):A(n),
+snd(bi):B(n,fst(bi)), whence the right hand sides are well-formed.
+
+P=Id(A(n),fst(case'(n,b1,...,bn)),case'(n,fst(b1),...,fst(bn)))
+case'(n,refl,...,refl):P
+
+Q=Id(A(n),snd(case'(n,b1,...,bn)),case'(n,snd(b1),...,snd(bn)))
+case'(n,refl,...,refl):Q
+
+To compute b0 from b, first apply equations 1-4 on the spine until it
+consists only of applications of case' (at most k steps).
+
+Next, we'd like to apply the normalization algorithm of ITT to each of
+the branches of each case.
+
+Note that a termination proof of this step requires a normalization
+algorithm that brings terms to ITT-normal form even if the terms are
+only type correct in ETT+. I wouldn't be surprised if the correctness
+of the standard algorithm also in this setting falls out from some of
+the more extensional proofs of NBE termination, but I'm not sure.
+
+Note that each of the branches still have finite type (in the sense
+that they have type F for some finite set F) in the same context. That
+is, the (implicit) induction assumption holds good.
+
+Continue to apply 1-4 to the branches, and repeat until the result
+consists only of applications of case. I don't have a cogent argument
+for termination.
+
+================================================================================
